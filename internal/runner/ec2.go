@@ -124,7 +124,7 @@ func (r *EC2) runQuery(ctx context.Context, containerID string, query string) (s
 			return "", err
 		}
 
-		if strings.Index(stderr, "B::NetException: Connection refused") == -1 {
+		if strings.Contains(stderr, "B::NetException: Connection refused") {
 			break
 		}
 
