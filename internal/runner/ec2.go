@@ -7,10 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/pkg/errors"
 )
 
@@ -20,27 +19,27 @@ const (
 
 type EC2 struct {
 	ctx context.Context
-	ssm *ssm.SSM
+	ssm *ssm.Client
 
 	instanceID string
 }
 
-func NewEC2(ctx context.Context, s *session.Session, instanceID string) *EC2 {
+func NewEC2(ctx context.Context, cfg aws.Config, instanceID string) *EC2 {
 	return &EC2{
 		ctx:        ctx,
-		ssm:        ssm.New(s),
+		ssm:        ssm.NewFromConfig(cfg),
 		instanceID: instanceID,
 	}
 }
 
 func (r *EC2) sendCommand(ctx context.Context, cmd string) (stdout string, stderr string, err error) {
-	sendOutput, err := r.ssm.SendCommandWithContext(ctx, &ssm.SendCommandInput{
+	sendOutput, err := r.ssm.SendCommand(ctx, &ssm.SendCommandInput{
 		DocumentName: aws.String("AWS-RunShellScript"),
-		InstanceIds:  aws.StringSlice([]string{r.instanceID}),
-		Parameters: map[string][]*string{
-			"commands": aws.StringSlice([]string{cmd}),
+		InstanceIds:  []string{r.instanceID},
+		Parameters: map[string][]string{
+			"commands": {cmd},
 		},
-		TimeoutSeconds: aws.Int64(sendCommandTimeout),
+		TimeoutSeconds: sendCommandTimeout,
 	})
 	if err != nil {
 		return "", "", errors.Wrap(err, "send failed")
@@ -53,32 +52,32 @@ func (r *EC2) sendCommand(ctx context.Context, cmd string) (stdout string, stder
 	log.Printf("cmd %s: %s\n", *sendOutput.Command.CommandId, cmd)
 
 	for {
-		detailedInfo, err := r.ssm.GetCommandInvocationWithContext(ctx, &ssm.GetCommandInvocationInput{
+		invocation, err := r.ssm.GetCommandInvocation(ctx, &ssm.GetCommandInvocationInput{
 			CommandId:  sendOutput.Command.CommandId,
 			InstanceId: aws.String(r.instanceID),
 		})
 		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok {
-				if aerr.Code() == ssm.ErrCodeInvocationDoesNotExist {
-					log.Printf("unknown command invocation: %s", *sendOutput.Command.CommandId)
-					time.Sleep(50 * time.Millisecond)
+			var invocationDoesNotExist *ssmtypes.InvocationDoesNotExist
+			if errors.As(err, &invocationDoesNotExist) {
+				log.Printf("unknown command invocation: %s", *sendOutput.Command.CommandId)
+				time.Sleep(50 * time.Millisecond)
 
-					continue
-				}
+				continue
 			}
 
 			return "", "", errors.Wrap(err, "failed to get detailed description")
 		}
 
-		if strings.EqualFold(*detailedInfo.Status, "InProgress") {
+		if invocation.Status == ssmtypes.CommandInvocationStatusInProgress {
+			time.Sleep(50 * time.Millisecond)
 			continue
 		}
 
-		if detailedInfo.StandardOutputContent != nil {
-			stdout = *detailedInfo.StandardOutputContent
+		if invocation.StandardOutputContent != nil {
+			stdout = *invocation.StandardOutputContent
 		}
-		if detailedInfo.StandardErrorContent != nil {
-			stderr = *detailedInfo.StandardErrorContent
+		if invocation.StandardErrorContent != nil {
+			stderr = *invocation.StandardErrorContent
 		}
 
 		return stdout, stderr, nil
@@ -118,13 +117,13 @@ func (r *EC2) runQuery(ctx context.Context, containerID string, query string) (s
 	query = strings.ReplaceAll(query, "\"", "\\\"")
 	cmd := fmt.Sprintf("docker exec %s clickhouse-client -n -m --query \"%s\"", containerID, query)
 
-	for retry := 0; retry < 10; retry++ {
+	for retry := 0; retry < 15; retry++ {
 		stdout, stderr, err = r.sendCommand(ctx, cmd)
 		if err != nil {
 			return "", err
 		}
 
-		if strings.Contains(stderr, "B::NetException: Connection refused") {
+		if !strings.Contains(stderr, "DB::NetException: Connection refused") {
 			break
 		}
 

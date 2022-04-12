@@ -2,6 +2,7 @@ package restapi
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -48,7 +49,9 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 
 	exists, err := h.tagStorage.Exists(h.chServerImage, req.Version)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("failed to check tag '%s' existence: %v\n", req.Version, err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+
 		return
 	}
 
@@ -60,7 +63,9 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 	startedAt := time.Now()
 	output, err := h.r.RunQuery(r.Context(), req.Query, req.Version)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("query run failed: %v\n", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+
 		return
 	}
 

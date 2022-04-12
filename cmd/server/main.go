@@ -14,9 +14,7 @@ import (
 	"clickhouse-playground/pkg/dockertag"
 	api "clickhouse-playground/pkg/restapi"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
+	awsconf "github.com/aws/aws-sdk-go-v2/config"
 )
 
 const chServerImageName = "yandex/clickhouse-server"
@@ -34,15 +32,12 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(awsRegion),
-		Credentials: credentials.NewEnvCredentials(),
-	})
+	cfg, err := awsconf.LoadDefaultConfig(ctx, awsconf.WithRegion(awsRegion))
 	if err != nil {
-		log.Fatalf("session was not created: %v\n", err)
+		log.Fatalf("config load failed: %v\n", err)
 	}
 
-	run := runner.NewEC2(ctx, sess, awsInstanceID)
+	run := runner.NewEC2(ctx, cfg, awsInstanceID)
 
 	dockerhubCli := dockerhub.NewClient()
 	tagStorage := dockertag.NewStorage(time.Minute, dockerhubCli)
@@ -63,7 +58,8 @@ func main() {
 	<-stop
 	cancel()
 
-	shutdownCtx, _ := context.WithTimeout(ctx, shutdownTimeout)
+	shutdownCtx, shutdown := context.WithTimeout(ctx, shutdownTimeout)
+	defer shutdown()
 
 	err = srv.Shutdown(shutdownCtx)
 	if err != nil {
