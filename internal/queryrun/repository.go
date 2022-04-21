@@ -10,6 +10,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var ErrNotFound = errors.New("not found")
+
 type Repository interface {
 	Create(run *Run) error
 	Get(id string) (*Run, error)
@@ -62,6 +64,10 @@ func (r *Repo) Get(id string) (*Run, error) {
 	err = attributevalue.UnmarshalMap(out.Item, run)
 	if err != nil {
 		return nil, errors.Wrap(err, "unmarshal failed")
+	}
+
+	if run.ID == "" {
+		return nil, ErrNotFound
 	}
 
 	return run, nil
