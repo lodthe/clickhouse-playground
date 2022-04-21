@@ -6,20 +6,24 @@ import (
 	"net/http"
 	"time"
 
-	runner "clickhouse-playground/internal/runner"
+	"clickhouse-playground/internal/qrunner"
+	"clickhouse-playground/internal/queryrun"
 
 	"github.com/go-chi/chi/v5"
 )
 
 type queryHandler struct {
-	r             runner.Runner
+	r       qrunner.Runner
+	runRepo queryrun.Repository
+
 	tagStorage    TagStorage
 	chServerImage string
 }
 
-func newQueryHandler(r runner.Runner, storage TagStorage, chServerImage string) *queryHandler {
+func newQueryHandler(r qrunner.Runner, runRepo queryrun.Repository, storage TagStorage, chServerImage string) *queryHandler {
 	return &queryHandler{
 		r:             r,
+		runRepo:       runRepo,
 		tagStorage:    storage,
 		chServerImage: chServerImage,
 	}
@@ -64,6 +68,16 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 	output, err := h.r.RunQuery(r.Context(), req.Query, req.Version)
 	if err != nil {
 		log.Printf("query run failed: %v\n", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+
+		return
+	}
+
+	run := queryrun.New(req.Query)
+	run.Output = output
+	err = h.runRepo.Create(run)
+	if err != nil {
+		log.Printf("failed to save query run: %v\n", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 
 		return

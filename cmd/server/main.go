@@ -9,16 +9,19 @@ import (
 	"syscall"
 	"time"
 
-	"clickhouse-playground/internal/runner"
+	"clickhouse-playground/internal/qrunner"
+	"clickhouse-playground/internal/queryrun"
 	"clickhouse-playground/pkg/dockerhub"
 	"clickhouse-playground/pkg/dockertag"
 	api "clickhouse-playground/pkg/restapi"
 
 	awsconf "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
 const chServerImageName = "yandex/clickhouse-server"
 const shutdownTimeout = 5 * time.Second
+const tableName = "QueryRuns"
 
 func main() {
 	awsRegion := os.Getenv("AWS_REGION")
@@ -37,12 +40,15 @@ func main() {
 		log.Fatalf("config load failed: %v\n", err)
 	}
 
-	run := runner.NewEC2(ctx, cfg, awsInstanceID)
+	dynamodbClient := dynamodb.NewFromConfig(cfg)
+	runRepo := queryrun.NewRepository(ctx, dynamodbClient, tableName)
+
+	runner := qrunner.NewEC2(ctx, cfg, awsInstanceID)
 
 	dockerhubCli := dockerhub.NewClient()
 	tagStorage := dockertag.NewStorage(time.Minute, dockerhubCli)
 
-	router := api.NewRouter(run, tagStorage, chServerImageName, 60*time.Second)
+	router := api.NewRouter(runner, tagStorage, runRepo, chServerImageName, 60*time.Second)
 
 	srv := &http.Server{
 		Addr:    bindAddress,
