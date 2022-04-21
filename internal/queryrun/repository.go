@@ -31,14 +31,14 @@ func NewRepository(ctx context.Context, client *dynamodb.Client, tableName strin
 }
 
 func (r *Repo) Create(run *Run) error {
-	marshalled, err := attributevalue.MarshalMap(run)
+	marshaled, err := attributevalue.MarshalMap(run)
 	if err != nil {
 		return errors.Wrap(err, "marshal failed")
 	}
 
 	_, err = r.client.PutItem(r.ctx, &dynamodb.PutItemInput{
 		TableName: r.tableName,
-		Item:      marshalled,
+		Item:      marshaled,
 	})
 	if err != nil {
 		return errors.Wrap(err, "put failed")
