@@ -115,7 +115,7 @@ func (r *EC2) runQuery(ctx context.Context, containerID string, query string) (s
 	var err error
 
 	query = strings.ReplaceAll(query, "\"", "\\\"")
-	cmd := fmt.Sprintf("docker exec %s clickhouse-client -n -m --query %q", containerID, query)
+	cmd := fmt.Sprintf("docker exec %s clickhouse-client -n -m --query \"%s\"", containerID, query)
 
 	for retry := 0; retry < 15; retry++ {
 		stdout, stderr, err = r.sendCommand(ctx, cmd)

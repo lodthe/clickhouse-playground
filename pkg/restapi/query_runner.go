@@ -33,34 +33,35 @@ func (h *queryHandler) handle(r chi.Router) {
 	r.Post("/queries", h.runQuery)
 }
 
-type RunQueryRequest struct {
+type RunQueryInput struct {
 	Query   string `json:"query"`
 	Version string `json:"version"`
 }
 
-type RunQueryResponse struct {
+type RunQueryOutput struct {
+	QueryRunID  string `json:"query_run_id"`
 	Output      string `json:"output"`
 	TimeElapsed string `json:"time_elapsed"`
 }
 
 func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
-	var req RunQueryRequest
+	var req RunQueryInput
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	exists, err := h.tagStorage.Exists(h.chServerImage, req.Version)
 	if err != nil {
 		log.Printf("failed to check tag '%s' existence: %v\n", req.Version, err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 
 		return
 	}
 
 	if !exists {
-		http.Error(w, "unknown version", http.StatusBadRequest)
+		writeError(w, "unknown version", http.StatusBadRequest)
 		return
 	}
 
@@ -68,7 +69,7 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 	output, err := h.r.RunQuery(r.Context(), req.Query, req.Version)
 	if err != nil {
 		log.Printf("query run failed: %v\n", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 
 		return
 	}
@@ -78,15 +79,14 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 	err = h.runRepo.Create(run)
 	if err != nil {
 		log.Printf("failed to save query run: %v\n", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 
 		return
 	}
 
-	resp := RunQueryResponse{
-		Output:      output,
+	writeResult(w, RunQueryOutput{
+		QueryRunID:  run.ID,
+		Output:      run.Output,
 		TimeElapsed: time.Since(startedAt).Round(time.Millisecond).String(),
-	}
-
-	_ = json.NewEncoder(w).Encode(resp)
+	})
 }
