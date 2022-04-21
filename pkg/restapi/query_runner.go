@@ -30,7 +30,8 @@ func newQueryHandler(r qrunner.Runner, runRepo queryrun.Repository, storage TagS
 }
 
 func (h *queryHandler) handle(r chi.Router) {
-	r.Post("/queries", h.runQuery)
+	r.Post("/runs", h.runQuery)
+	r.Get("/runs/{id}", h.getQueryRun)
 }
 
 type RunQueryInput struct {
@@ -88,5 +89,37 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 		QueryRunID:  run.ID,
 		Output:      run.Output,
 		TimeElapsed: time.Since(startedAt).Round(time.Millisecond).String(),
+	})
+}
+
+type GetQueryRunInput struct {
+	ID string `json:"id"`
+}
+
+type GetQueryRunOutput struct {
+	QueryRunID string `json:"query_run_id"`
+	Input      string `json:"input"`
+	Output     string `json:"output"`
+}
+
+func (h *queryHandler) getQueryRun(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, "missed id", http.StatusBadRequest)
+		return
+	}
+
+	run, err := h.runRepo.Get(id)
+	if err != nil {
+		log.Printf("failed to find query run %s: %v\n", id, err)
+		writeError(w, "run not found", http.StatusBadRequest)
+
+		return
+	}
+
+	writeResult(w, GetQueryRunOutput{
+		QueryRunID: run.ID,
+		Input:      run.Input,
+		Output:     run.Output,
 	})
 }
