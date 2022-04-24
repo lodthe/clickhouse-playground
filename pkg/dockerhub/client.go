@@ -52,12 +52,12 @@ func (c *Client) GetTags(image string) ([]string, error) {
 		tags = append(tags, i.Name)
 	}
 
-	for i, j := 0, len(tags)-1; i < j; i, j = i+1, j-1 {
-		tags[i], tags[j] = tags[j], tags[i]
-	}
-
 	if hasLatest {
 		tags = append(tags, "latest")
+	}
+
+	for i, j := 0, len(tags)-1; i < j; i, j = i+1, j-1 {
+		tags[i], tags[j] = tags[j], tags[i]
 	}
 
 	return tags, nil
