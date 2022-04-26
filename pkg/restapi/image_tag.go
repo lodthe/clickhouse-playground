@@ -1,7 +1,7 @@
 package restapi
 
 import (
-	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -23,14 +23,18 @@ func (h *imageTagHandler) handle(r chi.Router) {
 	r.Get("/tags", h.getImageTags)
 }
 
-type ImageTagResponse []string
+type GetImageTagsOutput struct {
+	Tags []string `json:"tags"`
+}
 
 func (h *imageTagHandler) getImageTags(w http.ResponseWriter, r *http.Request) {
-	resp, err := h.tagStorage.GetAll(h.chServerImage)
+	tags, err := h.tagStorage.GetAll(h.chServerImage)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("failed to get image tags: %v\n", err)
+		writeError(w, err.Error(), http.StatusInternalServerError)
+
 		return
 	}
 
-	_ = json.NewEncoder(w).Encode(resp)
+	writeResult(w, GetImageTagsOutput{Tags: tags})
 }

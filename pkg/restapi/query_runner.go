@@ -6,57 +6,63 @@ import (
 	"net/http"
 	"time"
 
-	runner "clickhouse-playground/internal/runner"
+	"clickhouse-playground/internal/qrunner"
+	"clickhouse-playground/internal/queryrun"
 
 	"github.com/go-chi/chi/v5"
 )
 
 type queryHandler struct {
-	r             runner.Runner
+	r       qrunner.Runner
+	runRepo queryrun.Repository
+
 	tagStorage    TagStorage
 	chServerImage string
 }
 
-func newQueryHandler(r runner.Runner, storage TagStorage, chServerImage string) *queryHandler {
+func newQueryHandler(r qrunner.Runner, runRepo queryrun.Repository, storage TagStorage, chServerImage string) *queryHandler {
 	return &queryHandler{
 		r:             r,
+		runRepo:       runRepo,
 		tagStorage:    storage,
 		chServerImage: chServerImage,
 	}
 }
 
 func (h *queryHandler) handle(r chi.Router) {
-	r.Post("/queries", h.runQuery)
+	r.Post("/runs", h.runQuery)
+	r.Get("/runs/{id}", h.getQueryRun)
 }
 
-type RunQueryRequest struct {
+type RunQueryInput struct {
 	Query   string `json:"query"`
 	Version string `json:"version"`
 }
 
-type RunQueryResponse struct {
+type RunQueryOutput struct {
+	QueryRunID  string `json:"query_run_id"`
 	Output      string `json:"output"`
 	TimeElapsed string `json:"time_elapsed"`
 }
 
 func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
-	var req RunQueryRequest
+	var req RunQueryInput
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	exists, err := h.tagStorage.Exists(h.chServerImage, req.Version)
 	if err != nil {
 		log.Printf("failed to check tag '%s' existence: %v\n", req.Version, err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 
 		return
 	}
 
 	if !exists {
-		http.Error(w, "unknown version", http.StatusBadRequest)
+		writeError(w, "unknown version", http.StatusBadRequest)
 		return
 	}
 
@@ -64,15 +70,56 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 	output, err := h.r.RunQuery(r.Context(), req.Query, req.Version)
 	if err != nil {
 		log.Printf("query run failed: %v\n", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, "internal error", http.StatusInternalServerError)
 
 		return
 	}
 
-	resp := RunQueryResponse{
-		Output:      output,
-		TimeElapsed: time.Since(startedAt).Round(time.Millisecond).String(),
+	run := queryrun.New(req.Query)
+	run.Output = output
+	err = h.runRepo.Create(run)
+	if err != nil {
+		log.Printf("failed to save query run: %v\n", err)
+		writeError(w, "internal error", http.StatusInternalServerError)
+
+		return
 	}
 
-	_ = json.NewEncoder(w).Encode(resp)
+	writeResult(w, RunQueryOutput{
+		QueryRunID:  run.ID,
+		Output:      run.Output,
+		TimeElapsed: time.Since(startedAt).Round(time.Millisecond).String(),
+	})
+}
+
+type GetQueryRunInput struct {
+	ID string `json:"id"`
+}
+
+type GetQueryRunOutput struct {
+	QueryRunID string `json:"query_run_id"`
+	Input      string `json:"input"`
+	Output     string `json:"output"`
+}
+
+func (h *queryHandler) getQueryRun(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, "missed id", http.StatusBadRequest)
+		return
+	}
+
+	run, err := h.runRepo.Get(id)
+	if err != nil {
+		log.Printf("failed to find query run %s: %v\n", id, err)
+		writeError(w, "run not found", http.StatusBadRequest)
+
+		return
+	}
+
+	writeResult(w, GetQueryRunOutput{
+		QueryRunID: run.ID,
+		Input:      run.Input,
+		Output:     run.Output,
+	})
 }
