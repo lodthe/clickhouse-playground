@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,6 +16,8 @@ import (
 
 	awsconf "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
 )
 
 const chServerImageName = "yandex/clickhouse-server"
@@ -24,6 +25,9 @@ const shutdownTimeout = 5 * time.Second
 const tableName = "QueryRuns"
 
 func main() {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	awsRegion := os.Getenv("AWS_REGION")
 	awsInstanceID := os.Getenv("AWS_INSTANCE_ID")
 	bindAddress := os.Getenv("BIND_ADDRESS")
@@ -37,7 +41,7 @@ func main() {
 
 	cfg, err := awsconf.LoadDefaultConfig(ctx, awsconf.WithRegion(awsRegion))
 	if err != nil {
-		log.Fatalf("config load failed: %v\n", err)
+		zlog.Fatal().Err(err).Msg("failed to load AWS config")
 	}
 
 	dynamodbClient := dynamodb.NewFromConfig(cfg)
@@ -50,25 +54,27 @@ func main() {
 
 	router := api.NewRouter(runner, tagStorage, runRepo, chServerImageName, 60*time.Second)
 
+	zlog.Info().Str("address", bindAddress).Msg("starting the server")
+
 	srv := &http.Server{
 		Addr:    bindAddress,
 		Handler: router,
 	}
 	go func() {
-		err = srv.ListenAndServe()
-		if err != nil {
-			log.Fatalf("listen failed: %v\n", err)
+		err := srv.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			zlog.Fatal().Err(err).Msg("server listen failed")
 		}
 	}()
 
 	<-stop
 	cancel()
 
-	shutdownCtx, shutdown := context.WithTimeout(ctx, shutdownTimeout)
+	shutdownCtx, shutdown := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer shutdown()
 
 	err = srv.Shutdown(shutdownCtx)
 	if err != nil {
-		log.Printf("server shutdown failed: %v\n", err)
+		zlog.Error().Err(err).Msg("server shutdown failed")
 	}
 }

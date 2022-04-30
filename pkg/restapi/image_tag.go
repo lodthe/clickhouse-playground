@@ -1,10 +1,10 @@
 package restapi
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	zlog "github.com/rs/zerolog/log"
 )
 
 type imageTagHandler struct {
@@ -30,7 +30,7 @@ type GetImageTagsOutput struct {
 func (h *imageTagHandler) getImageTags(w http.ResponseWriter, r *http.Request) {
 	tags, err := h.tagStorage.GetAll(h.chServerImage)
 	if err != nil {
-		log.Printf("failed to get image tags: %v\n", err)
+		zlog.Error().Err(err).Str("image_tag", h.chServerImage).Msg("failed to get image tags")
 		writeError(w, err.Error(), http.StatusInternalServerError)
 
 		return

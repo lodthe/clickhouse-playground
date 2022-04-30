@@ -2,21 +2,25 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
 )
 
 func main() {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	awsRegion := os.Getenv("AWS_REGION")
 
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(awsRegion))
 	if err != nil {
-		log.Fatalf("config load failed: %v\n", err)
+		zlog.Fatal().Err(err).Msg("AWS config cannot be loaded")
 	}
 
 	client := dynamodb.NewFromConfig(cfg)
@@ -46,8 +50,8 @@ func main() {
 
 	_, err = client.CreateTable(context.TODO(), param)
 	if err != nil {
-		log.Fatalf("table creation failed: %s\n", err)
+		zlog.Fatal().Err(err).Msg("table creation failed")
 	}
 
-	log.Printf("table was created\n")
+	zlog.Info().Str("table_name", tableName).Msg("created successfully")
 }
