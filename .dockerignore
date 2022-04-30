@@ -1,2 +1,4 @@
+.env
+.github
 build
-scripts
+Makefile
