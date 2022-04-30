@@ -20,44 +20,40 @@ import (
 	zlog "github.com/rs/zerolog/log"
 )
 
-const chServerImageName = "yandex/clickhouse-server"
 const shutdownTimeout = 5 * time.Second
-const tableName = "QueryRuns"
 
 func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	awsRegion := os.Getenv("AWS_REGION")
-	awsInstanceID := os.Getenv("AWS_INSTANCE_ID")
-	bindAddress := os.Getenv("BIND_ADDRESS")
-	if bindAddress == "" {
-		bindAddress = ":9000"
+	config, err := LoadConfig()
+	if err != nil {
+		zlog.Fatal().Err(err).Msg("config cannot be loaded")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-	cfg, err := awsconf.LoadDefaultConfig(ctx, awsconf.WithRegion(awsRegion))
+	awsConfig, err := awsconf.LoadDefaultConfig(ctx, awsconf.WithRegion(config.AWSAuth.Region))
 	if err != nil {
 		zlog.Fatal().Err(err).Msg("failed to load AWS config")
 	}
 
-	dynamodbClient := dynamodb.NewFromConfig(cfg)
-	runRepo := queryrun.NewRepository(ctx, dynamodbClient, tableName)
+	dynamodbClient := dynamodb.NewFromConfig(awsConfig)
+	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWSQueryRunsTableName)
 
-	runner := qrunner.NewEC2(ctx, cfg, awsInstanceID)
+	runner := qrunner.NewEC2(ctx, awsConfig, config.EC2.AWSInstanceID)
 
 	dockerhubCli := dockerhub.NewClient()
-	tagStorage := dockertag.NewStorage(time.Minute, dockerhubCli)
+	tagStorage := dockertag.NewStorage(config.TagCacheLifetime, dockerhubCli)
 
-	router := api.NewRouter(runner, tagStorage, runRepo, chServerImageName, 60*time.Second)
+	router := api.NewRouter(runner, tagStorage, runRepo, config.DockerImageName, config.ServerTimeout)
 
-	zlog.Info().Str("address", bindAddress).Msg("starting the server")
+	zlog.Info().Str("address", config.ListeningAddress).Msg("starting the server")
 
 	srv := &http.Server{
-		Addr:    bindAddress,
+		Addr:    config.ListeningAddress,
 		Handler: router,
 	}
 	go func() {

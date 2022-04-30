@@ -15,6 +15,8 @@ require (
 	github.com/rs/zerolog v1.26.1
 )
 
+require github.com/caarlos0/env/v6 v6.9.1
+
 require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.11.2 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.3 // indirect
@@ -28,5 +30,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.11.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.3 // indirect
 	github.com/aws/smithy-go v1.11.2 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
