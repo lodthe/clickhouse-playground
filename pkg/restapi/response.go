@@ -2,8 +2,9 @@ package restapi
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
+
+	zlog "github.com/rs/zerolog/log"
 )
 
 type Response struct {
@@ -17,6 +18,12 @@ type ErrorResponse struct {
 }
 
 func writeError(w http.ResponseWriter, msg string, code int) {
+	if code < 600 { // nolint
+		w.WriteHeader(code)
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
 	writeResponse(w, &Response{
 		Error: &ErrorResponse{
 			Message: msg,
@@ -34,6 +41,6 @@ func writeResult(w http.ResponseWriter, result interface{}) {
 func writeResponse(w http.ResponseWriter, resp *Response) {
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
-		log.Printf("failed to encode response: %v\nresponse:\n%v\n\n", err, resp)
+		zlog.Error().Err(err).Interface("response", resp).Msg("response encoding failed")
 	}
 }

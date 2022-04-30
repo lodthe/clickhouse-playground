@@ -3,7 +3,6 @@ package qrunner
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/pkg/errors"
+	zlog "github.com/rs/zerolog/log"
 )
 
 const (
@@ -49,7 +49,7 @@ func (r *EC2) sendCommand(ctx context.Context, cmd string) (stdout string, stder
 		return "", "", errors.New("missed command")
 	}
 
-	log.Printf("cmd %s: %s\n", *sendOutput.Command.CommandId, cmd)
+	zlog.Debug().Str("id", *sendOutput.Command.CommandId).Str("command", cmd).Msg("sent a command to SSM")
 
 	for {
 		invocation, err := r.ssm.GetCommandInvocation(ctx, &ssm.GetCommandInvocationInput{
@@ -59,7 +59,7 @@ func (r *EC2) sendCommand(ctx context.Context, cmd string) (stdout string, stder
 		if err != nil {
 			var invocationDoesNotExist *ssmtypes.InvocationDoesNotExist
 			if errors.As(err, &invocationDoesNotExist) {
-				log.Printf("unknown command invocation: %s", *sendOutput.Command.CommandId)
+				zlog.Debug().Str("id", *sendOutput.Command.CommandId).Msg("invocation doesn't exist")
 				time.Sleep(50 * time.Millisecond)
 
 				continue

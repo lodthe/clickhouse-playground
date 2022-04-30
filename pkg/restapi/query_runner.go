@@ -2,7 +2,6 @@ package restapi
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
@@ -10,6 +9,8 @@ import (
 	"clickhouse-playground/internal/queryrun"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/pkg/errors"
+	zlog "github.com/rs/zerolog/log"
 )
 
 type queryHandler struct {
@@ -55,7 +56,7 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 
 	exists, err := h.tagStorage.Exists(h.chServerImage, req.Version)
 	if err != nil {
-		log.Printf("failed to check tag '%s' existence: %v\n", req.Version, err)
+		zlog.Error().Err(err).Str("version", req.Version).Msg("failed to check tag existence")
 		writeError(w, "internal error", http.StatusInternalServerError)
 
 		return
@@ -69,26 +70,30 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 	startedAt := time.Now()
 	output, err := h.r.RunQuery(r.Context(), req.Query, req.Version)
 	if err != nil {
-		log.Printf("query run failed: %v\n", err)
+		zlog.Error().Err(err).Interface("request", req).Msg("query run failed")
 		writeError(w, "internal error", http.StatusInternalServerError)
 
 		return
 	}
+
+	timeElapsed := time.Since(startedAt)
 
 	run := queryrun.New(req.Query)
 	run.Output = output
 	err = h.runRepo.Create(run)
 	if err != nil {
-		log.Printf("failed to save query run: %v\n", err)
+		zlog.Error().Err(err).Interface("model", run).Msg("a run cannot be saved")
 		writeError(w, "internal error", http.StatusInternalServerError)
 
 		return
 	}
 
+	zlog.Info().Str("id", run.ID).Dur("elapsed", timeElapsed).Msg("saved a new run")
+
 	writeResult(w, RunQueryOutput{
 		QueryRunID:  run.ID,
 		Output:      run.Output,
-		TimeElapsed: time.Since(startedAt).Round(time.Millisecond).String(),
+		TimeElapsed: timeElapsed.Round(time.Millisecond).String(),
 	})
 }
 
@@ -110,9 +115,13 @@ func (h *queryHandler) getQueryRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	run, err := h.runRepo.Get(id)
+	if errors.Is(err, queryrun.ErrNotFound) {
+		writeError(w, "run not found", http.StatusNotFound)
+		return
+	}
 	if err != nil {
-		log.Printf("failed to find query run %s: %v\n", id, err)
-		writeError(w, "run not found", http.StatusBadRequest)
+		zlog.Error().Err(err).Str("id", id).Msg("failed to find a run")
+		writeError(w, "internal error", http.StatusInternalServerError)
 
 		return
 	}
