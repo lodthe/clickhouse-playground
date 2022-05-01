@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
-	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -47,7 +45,7 @@ func (r *LocalDocker) pull(ctx context.Context, image string) error {
 	}
 	defer out.Close()
 
-	_, err = ioutil.ReadAll(out)
+	_, err = io.ReadAll(out)
 	if err != nil {
 		return errors.Wrap(err, "failed to read pull output")
 	}
@@ -72,7 +70,7 @@ func (r *LocalDocker) runContainer(ctx context.Context, clickhouseVersion string
 	pulledAt := time.Now()
 
 	const httpInterfacePort = nat.Port("8123/tcp")
-	hostPort = strconv.Itoa(50000 + rand.Intn(400))
+	hostPort = strconv.Itoa(50000 + rand.Intn(400)) // nolint:gosec
 
 	hostConfig := &container.HostConfig{
 		PortBindings: nat.PortMap{
@@ -209,37 +207,6 @@ func (r *LocalDocker) runQuery(ctx context.Context, containerID string, query st
 	}
 
 	return stdout + "\n" + stderr, nil
-}
-
-func (r *LocalDocker) runQueryViaHTTP(ctx context.Context, address string, query string) (string, error) {
-	values := make(url.Values)
-	values.Add("query", query)
-	address += "?" + values.Encode()
-
-	for retry := 0; retry < 20; retry++ {
-		output, err := func() (string, error) {
-			resp, err := http.Get(address)
-			if err != nil {
-				return "", err
-			}
-			defer resp.Body.Close()
-
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				zlog.Error().Err(err).Msg("failed to read clickhouse response body")
-				return "", err
-			}
-
-			return string(body), nil
-		}()
-		if err == nil {
-			return output, nil
-		}
-
-		time.Sleep(300 * time.Millisecond)
-	}
-
-	return "No response from the server :(", nil
 }
 
 func (r *LocalDocker) RunQuery(ctx context.Context, query string, version string) (string, error) {
