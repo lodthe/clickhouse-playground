@@ -16,6 +16,7 @@ import (
 
 	awsconf "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	dockercli "github.com/docker/docker/client"
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
 )
@@ -41,12 +42,27 @@ func main() {
 	}
 
 	dynamodbClient := dynamodb.NewFromConfig(awsConfig)
-	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWSQueryRunsTableName)
 
-	runner := qrunner.NewEC2(ctx, awsConfig, config.EC2.AWSInstanceID)
+	var runner qrunner.Runner
+	switch config.Runner {
+	case RunnerEC2:
+		runner = qrunner.NewEC2(ctx, awsConfig, config.DockerImageName, config.EC2.AWSInstanceID)
+
+	case RunnerLocalDocker:
+		dockerCli, err := dockercli.NewClientWithOpts(dockercli.WithAPIVersionNegotiation())
+		if err != nil {
+			zlog.Fatal().Err(err).Msg("failed to create docker engine client")
+		}
+
+		runner = qrunner.NewLocalDocker(ctx, dockerCli, config.DockerImageName)
+
+	default:
+		zlog.Fatal().Msg("invalid runner")
+	}
 
 	dockerhubCli := dockerhub.NewClient()
 	tagStorage := dockertag.NewStorage(config.TagCacheLifetime, dockerhubCli)
+	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWSQueryRunsTableName)
 
 	router := api.NewRouter(runner, tagStorage, runRepo, config.DockerImageName, config.ServerTimeout)
 

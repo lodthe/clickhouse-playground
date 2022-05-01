@@ -10,11 +10,12 @@ import (
 type Runner string
 
 const (
-	RunnerEC2 Runner = "EC2"
+	RunnerEC2         Runner = "EC2"
+	RunnerLocalDocker Runner = "LOCAL_DOCKER"
 )
 
 type Config struct {
-	DockerImageName string `env:"DOCKER_IMAGE_NAME,required" envDefault:"yandex/clickhouse-server"`
+	DockerImageName string `env:"DOCKER_IMAGE_NAME,required" envDefault:"clickhouse/clickhouse-server"`
 
 	TagCacheLifetime time.Duration `env:"TAG_CACHE_LIFETIME" envDefault:"1m"`
 
@@ -24,8 +25,9 @@ type Config struct {
 	AWSAuth               AWSAuth
 	AWSQueryRunsTableName string `env:"AWS_QUERY_RUNS_TABLE_NAME,required"`
 
-	Runner Runner `env:"RUNNER,required" envDefault:"EC2"`
-	EC2    *EC2
+	Runner      Runner `env:"RUNNER,required" envDefault:"EC2"`
+	EC2         *EC2
+	LocalDocker *LocalDocker
 }
 
 type AWSAuth struct {
@@ -36,6 +38,9 @@ type AWSAuth struct {
 
 type EC2 struct {
 	AWSInstanceID string `env:"AWS_INSTANCE_ID,required"`
+}
+
+type LocalDocker struct {
 }
 
 func LoadConfig() (*Config, error) {
@@ -51,6 +56,13 @@ func LoadConfig() (*Config, error) {
 		err = env.Parse(cfg.EC2)
 		if err != nil {
 			return nil, errors.Wrap(err, "EC2 runner config load")
+		}
+
+	case RunnerLocalDocker:
+		cfg.LocalDocker = new(LocalDocker)
+		err = env.Parse(cfg.LocalDocker)
+		if err != nil {
+			return nil, errors.Wrap(err, "LocalDocker runner config load")
 		}
 
 	default:

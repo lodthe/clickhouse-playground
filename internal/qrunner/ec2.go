@@ -17,17 +17,20 @@ const (
 	sendCommandTimeout = 30
 )
 
+// EC2 is a runner that executes SQL queries on the specified EC2 instance via Amazon SSM.
 type EC2 struct {
 	ctx context.Context
 	ssm *ssm.Client
 
+	imageName  string
 	instanceID string
 }
 
-func NewEC2(ctx context.Context, cfg aws.Config, instanceID string) *EC2 {
+func NewEC2(ctx context.Context, cfg aws.Config, imageName string, instanceID string) *EC2 {
 	return &EC2{
 		ctx:        ctx,
 		ssm:        ssm.NewFromConfig(cfg),
+		imageName:  imageName,
 		instanceID: instanceID,
 	}
 }
@@ -86,7 +89,7 @@ func (r *EC2) sendCommand(ctx context.Context, cmd string) (stdout string, stder
 
 func (r *EC2) runContainer(ctx context.Context, clickhouseVersion string) (string, error) {
 	// TODO: Fix injection.
-	cmd := fmt.Sprintf("docker run -d --ulimit nofile=262144:262144 -p 8123 yandex/clickhouse-server:%s", clickhouseVersion)
+	cmd := fmt.Sprintf("docker run -d --ulimit nofile=262144:262144 -p 8123 %s:%s", r.imageName, clickhouseVersion)
 	stdout, _, err := r.sendCommand(ctx, cmd)
 	if err != nil {
 		return "", err
