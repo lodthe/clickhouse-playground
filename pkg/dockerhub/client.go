@@ -6,17 +6,24 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
+	"go.uber.org/ratelimit"
 )
 
-const URL = "https://registry.hub.docker.com/v1"
+const DockerHubURL = "https://hub.docker.com/v2"
+const DefaultMaxRPS = 5
 
 type Client struct {
+	apiURL string
+	rl     ratelimit.Limiter
+
 	cli *http.Client
 }
 
-func NewClient(httpCli ...*http.Client) *Client {
+func NewClient(apiURL string, maxRPS int, httpCli ...*http.Client) *Client {
 	c := &Client{
-		cli: http.DefaultClient,
+		apiURL: apiURL,
+		rl:     ratelimit.New(maxRPS),
+		cli:    http.DefaultClient,
 	}
 	if len(httpCli) == 1 {
 		c.cli = httpCli[0]
@@ -26,39 +33,41 @@ func NewClient(httpCli ...*http.Client) *Client {
 }
 
 // GetTags fetches tags of the given image.
-// The returned list of tags is a reversed version of the response, the "latest" tag has the first place.
-func (c *Client) GetTags(image string) ([]string, error) {
-	resp, err := c.cli.Get(fmt.Sprintf("%s/repositories/%s/tags", URL, image))
+func (c *Client) GetTags(image string) ([]ImageTag, error) {
+	nextURL := fmt.Sprintf("%s/repositories/%s/tags/", c.apiURL, image)
+
+	var tags []ImageTag
+	for {
+		resp, err := c.getTags(nextURL)
+		if err != nil {
+			return nil, err
+		}
+
+		tags = append(tags, resp.Results...)
+		if resp.Next == nil {
+			break
+		}
+
+		nextURL = *resp.Next
+	}
+
+	return tags, nil
+}
+
+func (c *Client) getTags(url string) (*GetImageTagsResponse, error) {
+	c.rl.Take()
+
+	resp, err := c.cli.Get(url)
 	if err != nil {
 		return nil, errors.Wrap(err, "request failed")
 	}
 	defer resp.Body.Close()
 
-	var list []TagList
-	err = json.NewDecoder(resp.Body).Decode(&list)
+	response := new(GetImageTagsResponse)
+	err = json.NewDecoder(resp.Body).Decode(response)
 	if err != nil {
 		return nil, errors.Wrap(err, "unmarshal failed")
 	}
 
-	// Reverse the list of tags and put the "latest" in the first place.
-	var hasLatest bool
-	tags := make([]string, 0, len(list))
-	for _, i := range list {
-		if i.Name == "latest" {
-			hasLatest = true
-			continue
-		}
-
-		tags = append(tags, i.Name)
-	}
-
-	if hasLatest {
-		tags = append(tags, "latest")
-	}
-
-	for i, j := 0, len(tags)-1; i < j; i, j = i+1, j-1 {
-		tags[i], tags[j] = tags[j], tags[i]
-	}
-
-	return tags, nil
+	return response, nil
 }

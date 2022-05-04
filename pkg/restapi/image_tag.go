@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	zlog "github.com/rs/zerolog/log"
 )
 
 type imageTagHandler struct {
@@ -28,13 +27,12 @@ type GetImageTagsOutput struct {
 }
 
 func (h *imageTagHandler) getImageTags(w http.ResponseWriter, r *http.Request) {
-	tags, err := h.tagStorage.GetAll(h.chServerImage)
-	if err != nil {
-		zlog.Error().Err(err).Str("image_tag", h.chServerImage).Msg("failed to get image tags")
-		writeError(w, err.Error(), http.StatusInternalServerError)
+	tags := h.tagStorage.GetAll()
 
-		return
+	names := make([]string, 0, len(tags))
+	for _, t := range tags {
+		names = append(names, t.TagName)
 	}
 
-	writeResult(w, GetImageTagsOutput{Tags: tags})
+	writeResult(w, GetImageTagsOutput{Tags: names})
 }

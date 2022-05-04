@@ -15,9 +15,7 @@ const (
 )
 
 type Config struct {
-	DockerImageName string `env:"DOCKER_IMAGE_NAME,required" envDefault:"clickhouse/clickhouse-server"`
-
-	TagCacheLifetime time.Duration `env:"TAG_CACHE_LIFETIME" envDefault:"1m"`
+	DockerImage DockerImage
 
 	ListeningAddress string        `env:"LISTENING_ADDRESS" envDefault:":9000"`
 	ServerTimeout    time.Duration `env:"SERVER_TIMEOUT" envDefault:"60s"`
@@ -28,6 +26,13 @@ type Config struct {
 	Runner      Runner `env:"RUNNER,required" envDefault:"EC2"`
 	EC2         *EC2
 	LocalDocker *LocalDocker
+}
+
+type DockerImage struct {
+	Name          string        `env:"DOCKER_IMAGE_NAME,required" envDefault:"clickhouse/clickhouse-server"`
+	OS            string        `env:"DOCKER_IMAGE_OS" envDefault:"linux"`
+	Architecture  string        `env:"DOCKER_IMAGE_ARCHITECTURE" envDefault:"amd64"`
+	CacheLifetime time.Duration `env:"DOCKER_IMAGE_TAG_CACHE_LIFETIME" envDefault:"3m"`
 }
 
 type AWSAuth struct {

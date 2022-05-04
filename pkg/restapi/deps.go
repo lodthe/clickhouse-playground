@@ -1,6 +1,8 @@
 package restapi
 
+import "clickhouse-playground/internal/dockertag"
+
 type TagStorage interface {
-	GetAll(image string) ([]string, error)
-	Exists(image string, tag string) (bool, error)
+	GetAll() []dockertag.ImageTag
+	Exists(tag string) bool
 }

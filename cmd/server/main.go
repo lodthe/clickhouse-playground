@@ -8,10 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/qrunner"
 	"clickhouse-playground/internal/queryrun"
 	"clickhouse-playground/pkg/dockerhub"
-	"clickhouse-playground/pkg/dockertag"
 	api "clickhouse-playground/pkg/restapi"
 
 	awsconf "github.com/aws/aws-sdk-go-v2/config"
@@ -46,7 +46,7 @@ func main() {
 	var runner qrunner.Runner
 	switch config.Runner {
 	case RunnerEC2:
-		runner = qrunner.NewEC2(ctx, awsConfig, config.DockerImageName, config.EC2.AWSInstanceID)
+		runner = qrunner.NewEC2(ctx, awsConfig, config.DockerImage.Name, config.EC2.AWSInstanceID)
 
 	case RunnerLocalDocker:
 		dockerCli, err := dockercli.NewClientWithOpts(dockercli.WithAPIVersionNegotiation())
@@ -54,17 +54,23 @@ func main() {
 			zlog.Fatal().Err(err).Msg("failed to create docker engine client")
 		}
 
-		runner = qrunner.NewLocalDocker(ctx, dockerCli, config.DockerImageName)
+		runner = qrunner.NewLocalDocker(ctx, dockerCli, config.DockerImage.Name)
 
 	default:
 		zlog.Fatal().Msg("invalid runner")
 	}
 
-	dockerhubCli := dockerhub.NewClient()
-	tagStorage := dockertag.NewStorage(config.TagCacheLifetime, dockerhubCli)
+	dockerhubCli := dockerhub.NewClient(dockerhub.DockerHubURL, dockerhub.DefaultMaxRPS)
+	tagStorage := dockertag.NewStorage(dockertag.Config{
+		Image:          config.DockerImage.Name,
+		OS:             config.DockerImage.OS,
+		Architecture:   config.DockerImage.Architecture,
+		ExpirationTime: config.DockerImage.CacheLifetime,
+	}, dockerhubCli)
+
 	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWSQueryRunsTableName)
 
-	router := api.NewRouter(runner, tagStorage, runRepo, config.DockerImageName, config.ServerTimeout)
+	router := api.NewRouter(runner, tagStorage, runRepo, config.DockerImage.Name, config.ServerTimeout)
 
 	zlog.Info().Str("address", config.ListeningAddress).Msg("starting the server")
 

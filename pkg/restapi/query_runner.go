@@ -54,15 +54,7 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exists, err := h.tagStorage.Exists(h.chServerImage, req.Version)
-	if err != nil {
-		zlog.Error().Err(err).Str("version", req.Version).Msg("failed to check tag existence")
-		writeError(w, "internal error", http.StatusInternalServerError)
-
-		return
-	}
-
-	if !exists {
+	if !h.tagStorage.Exists(req.Version) {
 		writeError(w, "unknown version", http.StatusBadRequest)
 		return
 	}
