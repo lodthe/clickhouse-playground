@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"clickhouse-playground/internal/dockertag"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockercli "github.com/docker/docker/client"
@@ -19,31 +21,69 @@ import (
 	zlog "github.com/rs/zerolog/log"
 )
 
+type ImageTagStorage interface {
+	Get(version string) *dockertag.ImageTag
+}
+
 // LocalDocker executes SQL queries in docker containers
 // that are created locally (Docker client engine API).
 type LocalDocker struct {
 	ctx context.Context
 	cli *dockercli.Client
 
-	image string
+	repository string
+
+	tagStorage ImageTagStorage
 }
 
-func NewLocalDocker(ctx context.Context, cli *dockercli.Client, imageName string) *LocalDocker {
+func NewLocalDocker(ctx context.Context, cli *dockercli.Client, repository string, tagStorage ImageTagStorage) *LocalDocker {
 	return &LocalDocker{
-		ctx:   ctx,
-		cli:   cli,
-		image: imageName,
+		ctx:        ctx,
+		cli:        cli,
+		repository: repository,
+		tagStorage: tagStorage,
 	}
 }
 
-func (r *LocalDocker) pull(ctx context.Context, image string) error {
+func (r *LocalDocker) pull(ctx context.Context, version string) error {
 	startedAt := time.Now()
+	imageName := FullImageName(r.repository, version)
 
-	out, err := r.cli.ImagePull(ctx, image, types.ImagePullOptions{})
+	tag := r.tagStorage.Get(version)
+	if tag == nil {
+		return errors.New("version not found")
+	}
+
+	chpImageName := PlaygroundImageName(r.repository, tag.Digest)
+
+	_, _, err := r.cli.ImageInspectWithRaw(ctx, chpImageName)
+	if err == nil {
+		zlog.Debug().
+			Dur("elapsed_ms", time.Since(startedAt)).
+			Str("image", chpImageName).
+			Msg("the image has already been pulled")
+
+		return nil
+	}
+	if err != nil && !dockercli.IsErrNotFound(err) {
+		zlog.Error().Err(err).Str("image", imageName).Msg("docker inspect failed")
+	}
+
+	out, err := r.cli.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
 	defer out.Close()
+
+	err = r.cli.ImageTag(ctx, imageName, chpImageName)
+	if err != nil {
+		zlog.Error().Err(err).
+			Str("source", imageName).
+			Str("target", chpImageName).
+			Msg("failed to rename image")
+
+		return errors.Wrap(err, "failed to tag image")
+	}
 
 	_, err = io.ReadAll(out)
 	if err != nil {
@@ -52,7 +92,7 @@ func (r *LocalDocker) pull(ctx context.Context, image string) error {
 
 	zlog.Debug().
 		Dur("elapsed_ms", time.Since(startedAt)).
-		Str("image", image).
+		Str("image", imageName).
 		Msg("image has been pulled")
 
 	return nil
@@ -60,9 +100,7 @@ func (r *LocalDocker) pull(ctx context.Context, image string) error {
 
 // runContainer starts a container and returns its id.
 func (r *LocalDocker) runContainer(ctx context.Context, clickhouseVersion string) (id string, hostPort string, err error) {
-	image := fmt.Sprintf("%s:%s", r.image, clickhouseVersion)
-
-	err = r.pull(ctx, image)
+	err = r.pull(ctx, clickhouseVersion)
 	if err != nil {
 		return "", "", errors.Wrap(err, "pull failed")
 	}
@@ -84,7 +122,7 @@ func (r *LocalDocker) runContainer(ctx context.Context, clickhouseVersion string
 	}
 
 	contConfig := &container.Config{
-		Image: fmt.Sprintf("%s:%s", r.image, clickhouseVersion),
+		Image: fmt.Sprintf("%s:%s", r.repository, clickhouseVersion),
 		Labels: map[string]string{
 			"clickhouse-playground": "true",
 		},

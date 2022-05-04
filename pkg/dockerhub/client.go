@@ -3,9 +3,11 @@ package dockerhub
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/pkg/errors"
+	zlog "github.com/rs/zerolog/log"
 	"go.uber.org/ratelimit"
 )
 
@@ -63,9 +65,16 @@ func (c *Client) getTags(url string) (*GetImageTagsResponse, error) {
 	}
 	defer resp.Body.Close()
 
-	response := new(GetImageTagsResponse)
-	err = json.NewDecoder(resp.Body).Decode(response)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		return nil, errors.Wrap(err, "body read failed")
+	}
+
+	response := new(GetImageTagsResponse)
+	err = json.Unmarshal(body, response)
+	if err != nil {
+		zlog.Error().Err(err).Str("url", url).Str("body", string(body)).Msg("failed to fetch image tags")
+
 		return nil, errors.Wrap(err, "unmarshal failed")
 	}
 

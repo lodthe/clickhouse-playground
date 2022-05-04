@@ -43,6 +43,14 @@ func main() {
 
 	dynamodbClient := dynamodb.NewFromConfig(awsConfig)
 
+	dockerhubCli := dockerhub.NewClient(dockerhub.DockerHubURL, dockerhub.DefaultMaxRPS)
+	tagStorage := dockertag.NewStorage(dockertag.Config{
+		Image:          config.DockerImage.Name,
+		OS:             config.DockerImage.OS,
+		Architecture:   config.DockerImage.Architecture,
+		ExpirationTime: config.DockerImage.CacheLifetime,
+	}, dockerhubCli)
+
 	var runner qrunner.Runner
 	switch config.Runner {
 	case RunnerEC2:
@@ -54,19 +62,11 @@ func main() {
 			zlog.Fatal().Err(err).Msg("failed to create docker engine client")
 		}
 
-		runner = qrunner.NewLocalDocker(ctx, dockerCli, config.DockerImage.Name)
+		runner = qrunner.NewLocalDocker(ctx, dockerCli, config.DockerImage.Name, tagStorage)
 
 	default:
 		zlog.Fatal().Msg("invalid runner")
 	}
-
-	dockerhubCli := dockerhub.NewClient(dockerhub.DockerHubURL, dockerhub.DefaultMaxRPS)
-	tagStorage := dockertag.NewStorage(dockertag.Config{
-		Image:          config.DockerImage.Name,
-		OS:             config.DockerImage.OS,
-		Architecture:   config.DockerImage.Architecture,
-		ExpirationTime: config.DockerImage.CacheLifetime,
-	}, dockerhubCli)
 
 	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWSQueryRunsTableName)
 
