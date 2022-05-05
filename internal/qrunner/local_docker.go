@@ -3,6 +3,7 @@ package qrunner
 import (
 	"bytes"
 	"context"
+	"io"
 	"strings"
 	"time"
 
@@ -73,14 +74,20 @@ func (r *LocalDocker) pull(ctx context.Context, version string) (chpImageName st
 		return chpImageName, nil
 	}
 	if err != nil && !dockercli.IsErrNotFound(err) {
-		zlog.Error().Err(err).Str("image", imageName).Msg("docker inspect failed")
+		zlog.Error().Err(err).Str("image", chpImageName).Msg("docker inspect failed")
 	}
 
 	out, err := r.cli.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
 		return "", errors.Wrap(err, "docker pull failed")
 	}
-	defer out.Close()
+
+	output, err := io.ReadAll(out)
+	if err != nil {
+		zlog.Error().Err(err).Str("image", imageName).Msg("failed to read pull output")
+	}
+
+	zlog.Debug().Str("image", imageName).Str("output", string(output)).Msg("base image has been pulled")
 
 	err = r.cli.ImageTag(ctx, imageName, chpImageName)
 	if err != nil {
