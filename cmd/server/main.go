@@ -44,12 +44,13 @@ func main() {
 	dynamodbClient := dynamodb.NewFromConfig(awsConfig)
 
 	dockerhubCli := dockerhub.NewClient(dockerhub.DockerHubURL, dockerhub.DefaultMaxRPS)
-	tagStorage := dockertag.NewStorage(dockertag.Config{
+	tagStorage := dockertag.NewCache(ctx, dockertag.Config{
 		Image:          config.DockerImage.Name,
 		OS:             config.DockerImage.OS,
 		Architecture:   config.DockerImage.Architecture,
 		ExpirationTime: config.DockerImage.CacheLifetime,
 	}, dockerhubCli)
+	tagStorage.RunBackgroundUpdate()
 
 	var runner qrunner.Runner
 	switch config.Runner {

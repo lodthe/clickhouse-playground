@@ -1,6 +1,7 @@
 package dockertag
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,6 +18,7 @@ type DockerHubClient interface {
 
 // Cache is a cache for the list of docker image's tags.
 type Cache struct {
+	ctx    context.Context
 	config Config
 	cli    DockerHubClient
 
@@ -28,11 +30,44 @@ type Cache struct {
 	tagsFlattened []ImageTag
 }
 
-func NewStorage(config Config, cli DockerHubClient) *Cache {
+func NewCache(ctx context.Context, config Config, cli DockerHubClient) *Cache {
 	return &Cache{
+		ctx:    ctx,
 		config: config,
 		cli:    cli,
 		tags:   make(map[string]ImageTag),
+	}
+}
+
+// RunBackgroundUpdate runs a background task that keeps data actual.
+func (c *Cache) RunBackgroundUpdate() {
+	go c.backgroundUpdate()
+}
+
+func (c *Cache) backgroundUpdate() {
+	update := func() {
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+
+		c.updateIfExpired()
+	}
+
+	zlog.Info().Msg("docker tag cache update background task has been started")
+
+	update()
+	t := time.NewTicker(c.config.ExpirationTime)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-c.ctx.Done():
+			zlog.Info().Msg("docker tag cache update background task has been finished")
+			return
+
+		case <-t.C:
+		}
+
+		update()
 	}
 }
 
