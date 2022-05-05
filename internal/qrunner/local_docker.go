@@ -3,10 +3,6 @@ package qrunner
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"io"
-	"math/rand"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,7 +12,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	dockercli "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	zlog "github.com/rs/zerolog/log"
 )
@@ -25,45 +20,57 @@ type ImageTagStorage interface {
 	Get(version string) *dockertag.ImageTag
 }
 
+type LocalDockerConfig struct {
+	ExecRetryDelay time.Duration
+	MaxExecRetries int
+}
+
+var DefaultLocalDockerConfig = LocalDockerConfig{
+	ExecRetryDelay: 200 * time.Millisecond,
+	MaxExecRetries: 20,
+}
+
 // LocalDocker executes SQL queries in docker containers
 // that are created locally (Docker client engine API).
 type LocalDocker struct {
 	ctx context.Context
-	cli *dockercli.Client
+	cfg LocalDockerConfig
 
 	repository string
 
+	cli        *dockercli.Client
 	tagStorage ImageTagStorage
 }
 
-func NewLocalDocker(ctx context.Context, cli *dockercli.Client, repository string, tagStorage ImageTagStorage) *LocalDocker {
+func NewLocalDocker(ctx context.Context, cfg LocalDockerConfig, cli *dockercli.Client, repository string, tagStorage ImageTagStorage) *LocalDocker {
 	return &LocalDocker{
 		ctx:        ctx,
+		cfg:        cfg,
 		cli:        cli,
 		repository: repository,
 		tagStorage: tagStorage,
 	}
 }
 
-func (r *LocalDocker) pull(ctx context.Context, version string) error {
+func (r *LocalDocker) pull(ctx context.Context, version string) (chpImageName string, err error) {
 	startedAt := time.Now()
 	imageName := FullImageName(r.repository, version)
 
 	tag := r.tagStorage.Get(version)
 	if tag == nil {
-		return errors.New("version not found")
+		return "", errors.New("version not found")
 	}
 
-	chpImageName := PlaygroundImageName(r.repository, tag.Digest)
+	chpImageName = PlaygroundImageName(r.repository, tag.Digest)
 
-	_, _, err := r.cli.ImageInspectWithRaw(ctx, chpImageName)
+	_, _, err = r.cli.ImageInspectWithRaw(ctx, chpImageName)
 	if err == nil {
 		zlog.Debug().
 			Dur("elapsed_ms", time.Since(startedAt)).
 			Str("image", chpImageName).
 			Msg("the image has already been pulled")
 
-		return nil
+		return chpImageName, nil
 	}
 	if err != nil && !dockercli.IsErrNotFound(err) {
 		zlog.Error().Err(err).Str("image", imageName).Msg("docker inspect failed")
@@ -71,7 +78,7 @@ func (r *LocalDocker) pull(ctx context.Context, version string) error {
 
 	out, err := r.cli.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
-		return err
+		return "", errors.Wrap(err, "docker pull failed")
 	}
 	defer out.Close()
 
@@ -82,12 +89,7 @@ func (r *LocalDocker) pull(ctx context.Context, version string) error {
 			Str("target", chpImageName).
 			Msg("failed to rename image")
 
-		return errors.Wrap(err, "failed to tag image")
-	}
-
-	_, err = io.ReadAll(out)
-	if err != nil {
-		return errors.Wrap(err, "failed to read pull output")
+		return "", errors.Wrap(err, "failed to tag image")
 	}
 
 	zlog.Debug().
@@ -95,57 +97,35 @@ func (r *LocalDocker) pull(ctx context.Context, version string) error {
 		Str("image", imageName).
 		Msg("image has been pulled")
 
-	return nil
+	return chpImageName, nil
 }
 
 // runContainer starts a container and returns its id.
-func (r *LocalDocker) runContainer(ctx context.Context, clickhouseVersion string) (id string, hostPort string, err error) {
-	err = r.pull(ctx, clickhouseVersion)
-	if err != nil {
-		return "", "", errors.Wrap(err, "pull failed")
-	}
-
-	pulledAt := time.Now()
-
-	const httpInterfacePort = nat.Port("8123/tcp")
-	hostPort = strconv.Itoa(50000 + rand.Intn(400)) // nolint:gosec
-
-	hostConfig := &container.HostConfig{
-		PortBindings: nat.PortMap{
-			httpInterfacePort: []nat.PortBinding{
-				{
-					HostIP:   "0.0.0.0",
-					HostPort: hostPort,
-				},
-			},
-		},
-	}
+func (r *LocalDocker) runContainer(ctx context.Context, imageName string) (id string, err error) {
+	invokedAt := time.Now()
 
 	contConfig := &container.Config{
-		Image: fmt.Sprintf("%s:%s", r.repository, clickhouseVersion),
+		Image: imageName,
 		Labels: map[string]string{
-			"clickhouse-playground": "true",
-		},
-		ExposedPorts: nat.PortSet{
-			httpInterfacePort: {},
+			"owner": "clickhouse-playground",
 		},
 	}
 
-	cont, err := r.cli.ContainerCreate(ctx, contConfig, hostConfig, nil, nil, "")
+	cont, err := r.cli.ContainerCreate(ctx, contConfig, new(container.HostConfig), nil, nil, "")
 	if err != nil {
-		return "", "", errors.Wrap(err, "container cannot be created")
+		return "", errors.Wrap(err, "container cannot be created")
 	}
 
 	zlog.Debug().
-		Dur("elapsed_ms", time.Since(pulledAt)).
-		Str("version", clickhouseVersion).
+		Dur("elapsed_ms", time.Since(invokedAt)).
+		Str("image", imageName).
 		Str("id", cont.ID).
 		Msg("container has been created")
 	createdAt := time.Now()
 
 	err = r.cli.ContainerStart(ctx, cont.ID, types.ContainerStartOptions{})
 	if err != nil {
-		return "", "", errors.Wrap(err, "container cannot be started")
+		return "", errors.Wrap(err, "container cannot be started")
 	}
 
 	if err != nil {
@@ -154,16 +134,16 @@ func (r *LocalDocker) runContainer(ctx context.Context, clickhouseVersion string
 
 	zlog.Debug().
 		Dur("elapsed_ms", time.Since(createdAt)).
-		Str("version", clickhouseVersion).
+		Str("image", imageName).
 		Str("id", cont.ID).
 		Msg("container has been started")
 
-	return cont.ID, hostPort, nil
+	return cont.ID, nil
 }
 
-func (r *LocalDocker) killContainer(ctx context.Context, id string) error {
+func (r *LocalDocker) killContainer(id string) error {
 	invokedAt := time.Now()
-	err := r.cli.ContainerKill(ctx, id, "KILL")
+	err := r.cli.ContainerKill(r.ctx, id, "KILL")
 
 	zlog.Debug().
 		Dur("elapsed_ms", time.Since(invokedAt)).
@@ -221,7 +201,7 @@ func (r *LocalDocker) runQuery(ctx context.Context, containerID string, query st
 	var stderr string
 	var err error
 
-	for retry := 0; retry < 15; retry++ {
+	for retry := 0; retry < r.cfg.MaxExecRetries; retry++ {
 		stdout, stderr, err = r.exec(ctx, containerID, query)
 		if err != nil {
 			return "", err
@@ -237,7 +217,7 @@ func (r *LocalDocker) runQuery(ctx context.Context, containerID string, query st
 			break
 		}
 
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(r.cfg.ExecRetryDelay)
 	}
 
 	if stderr == "" {
@@ -248,20 +228,31 @@ func (r *LocalDocker) runQuery(ctx context.Context, containerID string, query st
 }
 
 func (r *LocalDocker) RunQuery(ctx context.Context, query string, version string) (string, error) {
-	containerID, hostPort, err := r.runContainer(ctx, version)
+	chpImageName, err := r.pull(ctx, version)
+	if err != nil {
+		return "", errors.Wrap(err, "pull failed")
+	}
+
+	containerID, err := r.runContainer(ctx, chpImageName)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to run container")
 	}
 
-	defer func() {
-		err = r.killContainer(ctx, containerID)
+	done := make(chan struct{})
+	defer close(done)
+
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-done:
+		}
+
+		err = r.killContainer(containerID)
 		if err != nil {
 			zlog.Error().Err(err).Str("id", containerID).Msg("failed to kill container")
 		}
 	}()
 
-	addr := fmt.Sprintf("http://localhost:%s", hostPort)
-	_ = addr
 	output, err := r.runQuery(ctx, containerID, query)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to run query")
