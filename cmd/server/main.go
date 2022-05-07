@@ -63,7 +63,10 @@ func main() {
 			zlog.Fatal().Err(err).Msg("failed to create docker engine client")
 		}
 
-		runner = qrunner.NewLocalDocker(ctx, qrunner.DefaultLocalDockerConfig, dockerCli, config.DockerImage.Name, tagStorage)
+		localCfg := qrunner.DefaultLocalDockerConfig
+		localCfg.CustomConfigPath = config.CustomConfigPath
+
+		runner = qrunner.NewLocalDocker(ctx, localCfg, dockerCli, config.DockerImage.Name, tagStorage)
 
 	default:
 		zlog.Fatal().Msg("invalid runner")

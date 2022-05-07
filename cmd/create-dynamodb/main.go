@@ -45,7 +45,7 @@ func main() {
 			WriteCapacityUnits: aws.Int64(5),
 		},
 		TableName:  aws.String(tableName),
-		TableClass: types.TableClassStandardInfrequentAccess,
+		TableClass: types.TableClassStandard,
 	}
 
 	_, err = client.CreateTable(context.TODO(), param)

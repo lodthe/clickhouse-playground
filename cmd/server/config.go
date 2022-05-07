@@ -23,6 +23,8 @@ type Config struct {
 	AWSAuth               AWSAuth
 	AWSQueryRunsTableName string `env:"AWS_QUERY_RUNS_TABLE_NAME,required"`
 
+	CustomConfigPath *string `env:"CUSTOM_CONFIG_PATH"`
+
 	Runner      Runner `env:"RUNNER,required" envDefault:"EC2"`
 	EC2         *EC2
 	LocalDocker *LocalDocker

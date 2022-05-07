@@ -33,6 +33,8 @@ COPY --from=builder /opt/bin/application ./
 # Add required static files.
 #COPY assets assets
 
+COPY fast-startup-config.xml .
+
 EXPOSE 9000
 
 # Run the application.

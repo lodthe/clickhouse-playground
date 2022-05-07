@@ -3,7 +3,9 @@ package qrunner
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
+	"path"
 	"strings"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	dockercli "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/pkg/errors"
@@ -24,11 +27,16 @@ type ImageTagStorage interface {
 type LocalDockerConfig struct {
 	ExecRetryDelay time.Duration
 	MaxExecRetries int
+
+	// Path to the xml or yaml config which will be added to the ../config.d/ directory.
+	CustomConfigPath *string
 }
 
 var DefaultLocalDockerConfig = LocalDockerConfig{
 	ExecRetryDelay: 200 * time.Millisecond,
 	MaxExecRetries: 20,
+
+	CustomConfigPath: nil,
 }
 
 // LocalDocker executes SQL queries in docker containers
@@ -118,7 +126,19 @@ func (r *LocalDocker) runContainer(ctx context.Context, imageName string) (id st
 		},
 	}
 
-	cont, err := r.cli.ContainerCreate(ctx, contConfig, new(container.HostConfig), nil, nil, "")
+	hostConfig := new(container.HostConfig)
+
+	// A custom config is used to disable some ClickHouse features to speed up the startup.
+	if r.cfg.CustomConfigPath != nil {
+		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+			Type:     mount.TypeBind,
+			Source:   *r.cfg.CustomConfigPath,
+			Target:   fmt.Sprintf("/etc/clickhouse-server/config.d/custom-config%s", path.Ext(*r.cfg.CustomConfigPath)),
+			ReadOnly: true,
+		})
+	}
+
+	cont, err := r.cli.ContainerCreate(ctx, contConfig, hostConfig, nil, nil, "")
 	if err != nil {
 		return "", errors.Wrap(err, "container cannot be created")
 	}
