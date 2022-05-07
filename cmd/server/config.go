@@ -20,6 +20,8 @@ type Config struct {
 	ListeningAddress string        `env:"LISTENING_ADDRESS" envDefault:":9000"`
 	ServerTimeout    time.Duration `env:"SERVER_TIMEOUT" envDefault:"60s"`
 
+	PrometheusExportAddress string `env:"PROMETHEUS_ADDRESS" envDefault:":2112"`
+
 	AWSAuth               AWSAuth
 	AWSQueryRunsTableName string `env:"AWS_QUERY_RUNS_TABLE_NAME,required"`
 

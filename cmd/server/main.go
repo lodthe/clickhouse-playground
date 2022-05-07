@@ -17,6 +17,7 @@ import (
 	awsconf "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	dockercli "github.com/docker/docker/client"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
 )
@@ -76,16 +77,26 @@ func main() {
 
 	router := api.NewRouter(runner, tagStorage, runRepo, config.DockerImage.Name, config.ServerTimeout)
 
-	zlog.Info().Str("address", config.ListeningAddress).Msg("starting the server")
-
 	srv := &http.Server{
 		Addr:    config.ListeningAddress,
 		Handler: router,
 	}
 	go func() {
+		zlog.Info().Str("address", config.ListeningAddress).Msg("starting the server")
+
 		err := srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			zlog.Fatal().Err(err).Msg("server listen failed")
+		}
+	}()
+
+	go func() {
+		zlog.Info().Str("address", config.PrometheusExportAddress).Msg("starting the prometheus exporter")
+
+		http.Handle("/metrics", promhttp.Handler())
+		err := http.ListenAndServe(config.PrometheusExportAddress, nil)
+		if err != nil {
+			zlog.Error().Err(err).Msg("prometheus exporter failed")
 		}
 	}()
 
