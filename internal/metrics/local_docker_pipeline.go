@@ -8,7 +8,7 @@ import (
 )
 
 var LocalDockerPipeline = LocalDockerPipelineExporter{
-	histogram: promauto.NewHistogramVec(
+	duration: promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: "runner",
 			Name:      "pipeline_step_duration_seconds",
@@ -16,13 +16,14 @@ var LocalDockerPipeline = LocalDockerPipelineExporter{
 			ConstLabels: prometheus.Labels{
 				"runner": "local_docker",
 			},
+			Buckets: []float64{.01, .05, .1, .25, .5, 1, 2.5, 5, 10, 15, 30},
 		},
 		[]string{"step", "version", "status"},
 	),
 }
 
 type LocalDockerPipelineExporter struct {
-	histogram *prometheus.HistogramVec
+	duration *prometheus.HistogramVec
 }
 
 func (r *LocalDockerPipelineExporter) observe(step string, succeed bool, version string, startedAt time.Time) {
@@ -31,7 +32,7 @@ func (r *LocalDockerPipelineExporter) observe(step string, succeed bool, version
 		status = "failure"
 	}
 
-	r.histogram.
+	r.duration.
 		With(prometheus.Labels{
 			"step":    step,
 			"version": version,
