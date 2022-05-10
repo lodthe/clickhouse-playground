@@ -19,8 +19,9 @@ var RestAPI = RestAPIExporter{
 	duration: promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: "http",
-			Name:      "request_duration_milliseconds",
+			Name:      "request_duration_seconds",
 			Help:      "How long it took to handle the request.",
+			Buckets:   []float64{.005, .01, .05, .1, .25, .5, 1, 2.5, 5, 10, 15, 30},
 		},
 		[]string{"method", "path", "status"},
 	),
@@ -32,8 +33,6 @@ type RestAPIExporter struct {
 }
 
 func (r *RestAPIExporter) NewRequest(method string, path string, status string, duration time.Duration) {
-	const msInSecond = 1000
-
 	labels := prometheus.Labels{
 		"method": method,
 		"path":   path,
@@ -41,5 +40,5 @@ func (r *RestAPIExporter) NewRequest(method string, path string, status string, 
 	}
 
 	r.total.With(labels).Inc()
-	r.duration.With(labels).Observe(msInSecond * duration.Seconds())
+	r.duration.With(labels).Observe(duration.Seconds())
 }
