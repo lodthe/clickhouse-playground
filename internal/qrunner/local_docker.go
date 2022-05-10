@@ -234,9 +234,7 @@ func (r *LocalDocker) exec(ctx context.Context, state *localDockerRequestState) 
 		return "", "", ctx.Err()
 	}
 
-	zlog.Debug().
-		Dur("elapsed_ms", time.Since(invokedAt)).
-		Msg("exec finished")
+	zlog.Debug().Dur("elapsed_ms", time.Since(invokedAt)).Msg("exec finished")
 
 	return outBuf.String(), errBuf.String(), nil
 }
