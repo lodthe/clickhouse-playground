@@ -1,4 +1,5 @@
 .env
+config-prod.yaml
 .github
 build
 Makefile

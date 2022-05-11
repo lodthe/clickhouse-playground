@@ -37,7 +37,11 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-	awsConfig, err := awsconf.LoadDefaultConfig(ctx, awsconf.WithRegion(config.AWSAuth.Region))
+	awsConfig, err := awsconf.LoadDefaultConfig(
+		ctx,
+		awsconf.WithCredentialsProvider(config),
+		awsconf.WithRegion(config.AWS.Region),
+	)
 	if err != nil {
 		zlog.Fatal().Err(err).Msg("failed to load AWS config")
 	}
@@ -49,16 +53,16 @@ func main() {
 		Image:          config.DockerImage.Name,
 		OS:             config.DockerImage.OS,
 		Architecture:   config.DockerImage.Architecture,
-		ExpirationTime: config.DockerImage.CacheLifetime,
+		ExpirationTime: config.DockerImage.CacheExpirationTime,
 	}, dockerhubCli)
 	tagStorage.RunBackgroundUpdate()
 
 	var runner qrunner.Runner
-	switch config.Runner {
-	case RunnerEC2:
-		runner = qrunner.NewEC2(ctx, awsConfig, config.DockerImage.Name, config.EC2.AWSInstanceID)
+	switch config.Runner.Type {
+	case RunnerTypeEC2:
+		runner = qrunner.NewEC2(ctx, awsConfig, config.DockerImage.Name, config.Runner.EC2.InstanceID)
 
-	case RunnerLocalDocker:
+	case RunnerTypeLocalDocker:
 		dockerCli, err := dockercli.NewClientWithOpts(dockercli.WithAPIVersionNegotiation())
 		if err != nil {
 			zlog.Fatal().Err(err).Msg("failed to create docker engine client")
@@ -73,16 +77,16 @@ func main() {
 		zlog.Fatal().Msg("invalid runner")
 	}
 
-	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWSQueryRunsTableName)
+	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWS.QueryRunsTableName)
 
-	router := api.NewRouter(runner, tagStorage, runRepo, config.DockerImage.Name, config.ServerTimeout)
+	router := api.NewRouter(runner, tagStorage, runRepo, config.DockerImage.Name, config.API.ServerTimeout)
 
 	srv := &http.Server{
-		Addr:    config.ListeningAddress,
+		Addr:    config.API.ListeningAddress,
 		Handler: router,
 	}
 	go func() {
-		zlog.Info().Str("address", config.ListeningAddress).Msg("starting the server")
+		zlog.Info().Str("address", config.API.ListeningAddress).Msg("starting the server")
 
 		err := srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
