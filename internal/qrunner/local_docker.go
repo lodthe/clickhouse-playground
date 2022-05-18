@@ -274,19 +274,22 @@ func (r *LocalDocker) runQuery(ctx context.Context, state *localDockerRequestSta
 	return stdout + "\n" + stderr, nil
 }
 
-func (r *LocalDocker) killContainer(state *localDockerRequestState) (err error) {
+func (r *LocalDocker) removeContainer(state *localDockerRequestState) (err error) {
 	invokedAt := time.Now()
 	defer func() {
-		metrics.LocalDockerPipeline.KillContainer(err == nil, state.version, invokedAt)
+		metrics.LocalDockerPipeline.RemoveContainer(err == nil, state.version, invokedAt)
 	}()
 
-	err = r.cli.ContainerKill(r.ctx, state.containerID, "KILL")
+	err = r.cli.ContainerRemove(r.ctx, state.containerID, types.ContainerRemoveOptions{
+		RemoveVolumes: true,
+		Force:         true,
+	})
 
 	zlog.Debug().
 		Dur("elapsed_ms", time.Since(invokedAt)).
 		Str("image", state.chpImageName).
 		Str("id", state.containerID).
-		Msg("container has been killed")
+		Msg("container has been force removed")
 
 	return err
 }
@@ -316,7 +319,7 @@ func (r *LocalDocker) RunQuery(ctx context.Context, query string, version string
 		case <-done:
 		}
 
-		err = r.killContainer(state)
+		err = r.removeContainer(state)
 		if err != nil {
 			zlog.Error().Err(err).Str("id", state.containerID).Msg("failed to kill container")
 		}

@@ -61,6 +61,6 @@ func (r *LocalDockerPipelineExporter) RunQuery(succeed bool, version string, sta
 	r.observe("run_query", succeed, version, startedAt)
 }
 
-func (r *LocalDockerPipelineExporter) KillContainer(succeed bool, version string, startedAt time.Time) {
-	r.observe("kill_container", succeed, version, startedAt)
+func (r *LocalDockerPipelineExporter) RemoveContainer(succeed bool, version string, startedAt time.Time) {
+	r.observe("remove_container", succeed, version, startedAt)
 }
