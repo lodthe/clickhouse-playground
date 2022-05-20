@@ -1,4 +1,4 @@
-package qrunner
+package ec2
 
 import (
 	"context"
@@ -33,6 +33,29 @@ func NewEC2(ctx context.Context, cfg aws.Config, imageName string, instanceID st
 		imageName:  imageName,
 		instanceID: instanceID,
 	}
+}
+
+func (r *EC2) StartGarbageCollector() {
+	zlog.Info().Msg("gc is not implemented for the ec2 runner")
+}
+
+func (r *EC2) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
+	containerID, err := r.runContainer(ctx, version)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to run container")
+	}
+
+	output, err := r.runQuery(ctx, containerID, query)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to run query")
+	}
+
+	err = r.killContainer(ctx, containerID)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to kill container")
+	}
+
+	return output, nil
 }
 
 func (r *EC2) sendCommand(ctx context.Context, cmd string) (stdout string, stderr string, err error) {
@@ -138,23 +161,4 @@ func (r *EC2) runQuery(ctx context.Context, containerID string, query string) (s
 	}
 
 	return stdout + "\n" + stderr, nil
-}
-
-func (r *EC2) RunQuery(ctx context.Context, query string, version string) (string, error) {
-	containerID, err := r.runContainer(ctx, version)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to run container")
-	}
-
-	output, err := r.runQuery(ctx, containerID, query)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to run query")
-	}
-
-	err = r.killContainer(ctx, containerID)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to kill container")
-	}
-
-	return output, nil
 }
