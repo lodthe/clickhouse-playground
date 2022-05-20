@@ -10,6 +10,8 @@ import (
 
 	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/qrunner"
+	"clickhouse-playground/internal/qrunner/ec2"
+	"clickhouse-playground/internal/qrunner/localdocker"
 	"clickhouse-playground/internal/queryrun"
 	"clickhouse-playground/pkg/dockerhub"
 	api "clickhouse-playground/pkg/restapi"
@@ -60,7 +62,7 @@ func main() {
 	var runner qrunner.Runner
 	switch config.Runner.Type {
 	case RunnerTypeEC2:
-		runner = qrunner.NewEC2(ctx, awsConfig, config.DockerImage.Name, config.Runner.EC2.InstanceID)
+		runner = ec2.NewEC2(ctx, awsConfig, config.DockerImage.Name, config.Runner.EC2.InstanceID)
 
 	case RunnerTypeLocalDocker:
 		dockerCli, err := dockercli.NewClientWithOpts(dockercli.WithAPIVersionNegotiation())
@@ -68,14 +70,18 @@ func main() {
 			zlog.Fatal().Err(err).Msg("failed to create docker engine client")
 		}
 
-		localCfg := qrunner.DefaultLocalDockerConfig
+		localCfg := localdocker.DefaultLocalDockerConfig
 		localCfg.CustomConfigPath = config.CustomConfigPath
 
-		runner = qrunner.NewLocalDocker(ctx, localCfg, dockerCli, config.DockerImage.Name, tagStorage)
+		runner = localdocker.New(ctx, localCfg, dockerCli, config.DockerImage.Name, tagStorage)
 
 	default:
 		zlog.Fatal().Msg("invalid runner")
 	}
+
+	go func() {
+		runner.StartGarbageCollector()
+	}()
 
 	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWS.QueryRunsTableName)
 

@@ -59,8 +59,10 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	run := queryrun.New(req.Query)
+
 	startedAt := time.Now()
-	output, err := h.r.RunQuery(r.Context(), req.Query, req.Version)
+	output, err := h.r.RunQuery(r.Context(), run.ID, req.Query, req.Version)
 	if err != nil {
 		zlog.Error().Err(err).Interface("request", req).Msg("query run failed")
 		writeError(w, "internal error", http.StatusInternalServerError)
@@ -70,7 +72,6 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 
 	timeElapsed := time.Since(startedAt)
 
-	run := queryrun.New(req.Query)
 	run.Output = output
 	err = h.runRepo.Create(run)
 	if err != nil {
