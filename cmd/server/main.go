@@ -35,6 +35,13 @@ func main() {
 		zlog.Fatal().Err(err).Msg("config cannot be loaded")
 	}
 
+	lvl, err := zerolog.ParseLevel(config.LogLevel)
+	if err != nil {
+		zlog.Fatal().Err(err).Msg("invalid log level")
+	}
+
+	zlog.Logger = zlog.Logger.Level(lvl)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)

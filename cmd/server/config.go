@@ -24,6 +24,8 @@ const (
 )
 
 type Config struct {
+	LogLevel string `mapstructure:"log_level"`
+
 	DockerImage DockerImage `mapstructure:"docker_image"`
 
 	API API `mapstructure:"api"`
@@ -111,6 +113,10 @@ func LoadConfig() (*Config, error) {
 
 // validate verifies the loaded config and sets default values for missed fields.
 func (c *Config) validate() error {
+	if c.LogLevel == "" {
+		c.LogLevel = "debug"
+	}
+
 	if c.DockerImage.Name == "" {
 		return errors.New("docker_image.name is required")
 	}

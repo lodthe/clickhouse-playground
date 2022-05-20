@@ -1,5 +1,9 @@
 # The default config location is 'config.yaml', but it can be overridden via CONFIG_PATH env.
 
+# [OPTIONAL] Log redundancy level. Default: debug.
+# Available log levels: trace (all), debug, info, warn, error, fatal, disabled.
+log_level: info
+
 # ClickHouse Docker image configuration.
 docker_image:
   image: clickhouse/clickhouse-server
@@ -11,13 +15,13 @@ docker_image:
 
 # Rest API configuration.
 api:
-  # [OPTIONAL] Server listening address.
+  # [OPTIONAL] Server listening address. Default: :9000.
   address: :9000
 
-  # [OPTIONAL] Request processing timeout.
+  # [OPTIONAL] Request processing timeout. Default: 60s.
   server_timeout: 60s
 
-# [OPTIONAL] Prometheus metrics export address. The default value is :2112.
+# [OPTIONAL] Prometheus metrics export address. Default: :2112.
 prometheus_address: :2112
 
 aws:
