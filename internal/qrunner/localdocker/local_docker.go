@@ -178,6 +178,10 @@ func (r *Runner) triggerContainersGC() error {
 // If there are at least GCConfig.ImageGCCountThreshold downloaded chp images, it leaves GCConfig.ImageBufferSize
 // least recently tagged images and removes the others.
 func (r *Runner) triggerImagesGC() error {
+	if r.cfg.GC.ImageGCCountThreshold == nil {
+		return nil
+	}
+
 	images, err := r.cli.ImageList(r.ctx, types.ImageListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to list images")
@@ -201,7 +205,7 @@ func (r *Runner) triggerImagesGC() error {
 		candidates = append(candidates, img)
 	}
 
-	if len(candidates) < int(r.cfg.GC.ImageGCCountThreshold) {
+	if len(candidates) < int(*r.cfg.GC.ImageGCCountThreshold) {
 		return nil
 	}
 

@@ -47,4 +47,26 @@ runner:
     instance_id: i-023c5bb002bb45ad4
 
   # Required if type is LOCAL_DOCKER.
-  runner_local_docker:
+  local_docker:
+    # You can configure the garbage collector to prune hanged up containers and images.
+    # If the field is missed, gc is disabled.
+    # Default: gc is disabled.
+    gc:
+      # [OPTIONAL] How often the garbage collector should be triggered. Default: once a minute.
+      trigger_frequency: 1m
+
+      # Containers GC
+
+      # [OPTIONAL] Containers created before (NOW() - TTL) are force removed.
+      # Default: disabled (containers are not force removed).
+      container_ttl: 1m
+
+      # Images GC
+
+      # Image gc triggers when there are at least image_count_threshold downloaded images.
+      # Default: missed (images are not pruned).
+      image_count_threshold: 50
+
+      # # After the images garbage collection, at most image_buffer_size least recently tagged images will be left.
+      # Default: 0 (all images are pruned).
+      image_buffer_size: 30

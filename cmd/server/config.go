@@ -71,6 +71,16 @@ type EC2 struct {
 }
 
 type LocalDocker struct {
+	GC *LocalDockerGC `mapstructure:"gc"`
+}
+
+type LocalDockerGC struct {
+	TriggerFrequency time.Duration `mapstructure:"trigger_frequency"`
+
+	ContainerTTL *time.Duration `mapstructure:"container_ttl"`
+
+	ImageGCCountThreshold *uint `mapstructure:"image_count_threshold"`
+	ImageBufferSize       uint  `mapstructure:"image_buffer_size"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -158,6 +168,14 @@ func (c *Config) validate() error {
 		}
 
 	case RunnerTypeLocalDocker:
+		gc := c.Runner.LocalDocker.GC
+		if gc == nil {
+			break
+		}
+
+		if gc.TriggerFrequency == 0 {
+			gc.TriggerFrequency = 1 * time.Minute
+		}
 
 	case "":
 		return errors.New("runner.type is required")
