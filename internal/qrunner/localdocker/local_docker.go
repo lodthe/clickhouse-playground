@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -173,9 +174,85 @@ func (r *Runner) triggerContainersGC() error {
 	return nil
 }
 
+// triggerImagesGC tries to clean the space by removing most recently tagged images.
+// If there are at least GCConfig.ImageGCCountThreshold downloaded chp images, it leaves GCConfig.ImageBufferSize
+// least recently tagged images and removes the others.
 func (r *Runner) triggerImagesGC() error {
-	// Not implemented.
+	images, err := r.cli.ImageList(r.ctx, types.ImageListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "failed to list images")
+	}
+
+	// Find all images with chp tags.
+	var candidates []types.ImageSummary
+	for _, img := range images {
+		var matched bool
+		for _, tag := range img.RepoTags {
+			if qrunner.IsPlaygroundImageName(tag, r.repository) {
+				matched = true
+				break
+			}
+		}
+
+		if !matched {
+			continue
+		}
+
+		candidates = append(candidates, img)
+	}
+
+	if len(candidates) < int(r.cfg.GC.ImageGCCountThreshold) {
+		return nil
+	}
+
+	detailed := make([]types.ImageInspect, 0, len(candidates))
+	for _, c := range candidates {
+		inspect, _, err := r.cli.ImageInspectWithRaw(r.ctx, c.ID)
+		if err != nil {
+			zlog.Err(err).Str("image_id", c.ID).Msg("docker image inspect failed")
+			continue
+		}
+
+		detailed = append(detailed, inspect)
+	}
+
+	// Drop N least recently tagged images.
+	sort.Slice(detailed, func(i, j int) bool {
+		return detailed[i].Metadata.LastTagTime.Before(detailed[j].Metadata.LastTagTime)
+	})
+
+	if len(detailed) > int(r.cfg.GC.ImageBufferSize) {
+		r.removeImages(detailed[int(r.cfg.GC.ImageBufferSize):])
+	}
+
 	return nil
+}
+
+func (r *Runner) removeImages(images []types.ImageInspect) {
+	// Try to remove images.
+	var count uint
+	var reclaimedSpace int64
+	for _, img := range images {
+		for _, tag := range img.RepoTags {
+			_, err := r.cli.ImageRemove(r.ctx, tag, types.ImageRemoveOptions{
+				PruneChildren: true,
+			})
+			if err != nil {
+				zlog.Err(err).Str("image_id", img.ID).Msg("failed to delete image tag")
+				continue
+			}
+		}
+
+		zlog.Trace().Str("id", img.ID).Strs("tags", img.RepoTags).Msg("image has been removed")
+
+		count++
+		reclaimedSpace += img.Size
+	}
+
+	zlog.Info().
+		Int64("space_reclaimed_bytes", reclaimedSpace).
+		Uint("removed_image_count", count).
+		Msg("images have been pruned")
 }
 
 func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
