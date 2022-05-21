@@ -79,6 +79,17 @@ func main() {
 
 		localCfg := localdocker.DefaultLocalDockerConfig
 		localCfg.CustomConfigPath = config.CustomConfigPath
+		localCfg.GC = nil
+
+		gc := config.Runner.LocalDocker.GC
+		if gc != nil {
+			localCfg.GC = &localdocker.GCConfig{
+				TriggerFrequency:      gc.TriggerFrequency,
+				ContainerTTL:          gc.ContainerTTL,
+				ImageGCCountThreshold: gc.ImageGCCountThreshold,
+				ImageBufferSize:       gc.ImageBufferSize,
+			}
+		}
 
 		runner = localdocker.New(ctx, localCfg, dockerCli, config.DockerImage.Name, tagStorage)
 

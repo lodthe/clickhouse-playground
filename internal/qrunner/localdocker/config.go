@@ -18,15 +18,18 @@ type GCConfig struct {
 
 	// During the container garbage collection, all containers created
 	// before (time.Now() - ContainerTTL) will be removed.
+	// If ContainerTTL is nil, containers are not force removed.
 	ContainerTTL *time.Duration
 
 	// Image gc triggers when there are at least ImageGCCountThreshold downloaded chp images.
 	// After the garbage collection, at most ImageBufferSize least recently tagged images will be left.
-	ImageGCCountThreshold uint
+	// If ImageGCCountThreshold is missed, images are not pruned.
+	ImageGCCountThreshold *uint
 	ImageBufferSize       uint
 }
 
 var defaultContainerTTL = 60 * time.Second
+var defaultImageGCCountThreshold = uint(60)
 var defaultImageBufferSize = uint(30)
 
 var DefaultLocalDockerConfig = Config{
@@ -38,7 +41,7 @@ var DefaultLocalDockerConfig = Config{
 	GC: &GCConfig{
 		TriggerFrequency:      5 * time.Minute,
 		ContainerTTL:          &defaultContainerTTL,
-		ImageGCCountThreshold: defaultImageBufferSize * 2,
+		ImageGCCountThreshold: &defaultImageGCCountThreshold,
 		ImageBufferSize:       defaultImageBufferSize,
 	},
 }
