@@ -59,7 +59,7 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	run := queryrun.New(req.Query)
+	run := queryrun.New(req.Query, req.Version)
 
 	startedAt := time.Now()
 	output, err := h.r.RunQuery(r.Context(), run.ID, req.Query, req.Version)
@@ -96,6 +96,7 @@ type GetQueryRunInput struct {
 
 type GetQueryRunOutput struct {
 	QueryRunID string `json:"query_run_id"`
+	Version    string `json:"version"`
 	Input      string `json:"input"`
 	Output     string `json:"output"`
 }
@@ -121,6 +122,7 @@ func (h *queryHandler) getQueryRun(w http.ResponseWriter, r *http.Request) {
 
 	writeResult(w, GetQueryRunOutput{
 		QueryRunID: run.ID,
+		Version:    run.Version,
 		Input:      run.Input,
 		Output:     run.Output,
 	})
