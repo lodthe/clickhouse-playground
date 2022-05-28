@@ -7,14 +7,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-var DockerEngineGC = newRunnerGCExporter("docker_engine")
-
-func newRunnerGCExporter(runner string) RunnerGCExporter {
+func NewRunnerGCExporter(runnerType, runnerName string) *RunnerGCExporter {
 	runnerLabels := prometheus.Labels{
-		"runner": runner,
+		"runner_type": runnerType,
+		"runner_name": runnerName,
 	}
 
-	return RunnerGCExporter{
+	return &RunnerGCExporter{
 		duration: promauto.NewHistogramVec(
 			prometheus.HistogramOpts{
 				Namespace:   "runner",
