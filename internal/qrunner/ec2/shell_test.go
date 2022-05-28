@@ -31,7 +31,7 @@ func TestCmdRunContainer(t *testing.T) {
 
 	for _, tc := range cases {
 		got := cmdRunContainer(tc.repository, tc.version)
-		assert.Equal(t, got, tc.want, tc.version)
+		assert.Equal(t, tc.want, got, tc.version)
 	}
 }
 
@@ -60,7 +60,7 @@ func TestCmdRunQuery(t *testing.T) {
 
 	for _, tc := range cases {
 		got := cmdRunQuery(tc.containerID, tc.query)
-		assert.Equal(t, got, tc.want, tc.query)
+		assert.Equal(t, tc.want, got, tc.query)
 	}
 }
 
