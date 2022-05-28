@@ -1,7 +1,9 @@
-name: Publish Docker image
+name: Push Docker Image
 
 on:
-  workflow_call:
+  push:
+    branches:
+      - 'main'
 
 jobs:
   publish:
