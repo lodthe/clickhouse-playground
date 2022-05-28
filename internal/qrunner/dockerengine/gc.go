@@ -20,15 +20,17 @@ type garbageCollector struct {
 	cfg        *GCConfig
 	repository string
 
-	cli *dockercli.Client
+	cli  *dockercli.Client
+	metr *metrics.RunnerGCExporter
 }
 
-func newGarbageCollector(ctx context.Context, cfg *GCConfig, repository string, cli *dockercli.Client) *garbageCollector {
+func newGarbageCollector(ctx context.Context, cfg *GCConfig, repository string, cli *dockercli.Client, metr *metrics.RunnerGCExporter) *garbageCollector {
 	return &garbageCollector{
 		ctx:        ctx,
 		cfg:        cfg,
 		repository: repository,
 		cli:        cli,
+		metr:       metr,
 	}
 }
 
@@ -103,7 +105,7 @@ func (g *garbageCollector) trigger() (err error) {
 func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint64, err error) {
 	startedAt := time.Now()
 	defer func() {
-		metrics.DockerEngineGC.ContainersCollected(count, spaceReclaimed, startedAt)
+		g.metr.ContainersCollected(count, spaceReclaimed, startedAt)
 	}()
 
 	out, err := g.cli.ContainersPrune(g.ctx, filters.NewArgs(filters.Arg("label", qrunner.LabelOwnership)))
@@ -158,7 +160,7 @@ func (g *garbageCollector) collectImages() (count uint, spaceReclaimed uint64, e
 
 	startedAt := time.Now()
 	defer func() {
-		metrics.DockerEngineGC.ContainersCollected(count, spaceReclaimed, startedAt)
+		g.metr.ContainersCollected(count, spaceReclaimed, startedAt)
 	}()
 
 	images, err := g.cli.ImageList(g.ctx, types.ImageListOptions{})
