@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"strings"
 	"time"
 
 	"clickhouse-playground/internal/dockertag"
@@ -26,8 +25,10 @@ type ImageTagStorage interface {
 	Get(version string) *dockertag.ImageTag
 }
 
-// Runner executes SQL queries in docker containers
-// that are created locally (Docker client engine API).
+// Runner is a runner that creates database instances using Docker Engine API.
+//
+// This runner can start instances on arbitrary type of server, even on the same server where the coordinator
+// is started. The main requirement is the running Docker daemon and granted access to it.
 type Runner struct {
 	ctx context.Context
 	cfg Config
@@ -280,7 +281,7 @@ func (r *Runner) runQuery(ctx context.Context, state *requestState) (output stri
 			return "", err
 		}
 
-		if r.checkIfQueryExecuted(stdout, stderr) {
+		if qrunner.CheckIfClickHouseIsReady(stderr) {
 			zlog.Debug().Str("run_id", state.runID).Msg("query has been executed")
 			break
 		}
@@ -293,12 +294,4 @@ func (r *Runner) runQuery(ctx context.Context, state *requestState) (output stri
 	}
 
 	return stdout + "\n" + stderr, nil
-}
-
-// checkIfQueryExecuted checks whether a clickhouse instance has accepted a query.
-// We have no mechanism to be signaled when a clickhouse instance is ready to accept queries,
-// so we try to send them continuously until the instance accepts them.
-// When the instance is not ready, we received the 'Connection refused' exception.
-func (r *Runner) checkIfQueryExecuted(_, stderr string) bool {
-	return !strings.Contains(stderr, "DB::NetException: Connection refused")
 }

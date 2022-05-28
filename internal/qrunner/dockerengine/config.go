@@ -34,7 +34,9 @@ var defaultContainerTTL = 60 * time.Second
 var defaultImageGCCountThreshold = uint(60)
 var defaultImageBufferSize = uint(30)
 
-var DefaultDockerEngineConfig = Config{
+var DefaultConfig = Config{
+	Repository: "clickhouse/clickhouse-server",
+
 	ExecRetryDelay: 200 * time.Millisecond,
 	MaxExecRetries: 20,
 

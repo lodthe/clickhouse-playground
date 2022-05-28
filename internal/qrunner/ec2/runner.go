@@ -2,9 +2,10 @@ package ec2
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
+
+	"clickhouse-playground/internal/qrunner"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -13,59 +14,64 @@ import (
 	zlog "github.com/rs/zerolog/log"
 )
 
-const (
-	sendCommandTimeout = 30
-)
-
-// EC2 is a runner that executes SQL queries on the specified EC2 instance via Amazon SSM.
-type EC2 struct {
+// Runner is a EC2 type runner that executes SQL queries on the specified Amazon EC2 instance via Amazon SSM.
+//
+// This runner creates and manages Docker containers by sending shell commands that trigger Docker CLI.
+// The provided AWS config must be authorized to execute commands on the specified EC2 instance. Furthermore,
+// you have to start the SSM daemon on the server.
+type Runner struct {
 	ctx context.Context
-	ssm *ssm.Client
+	cfg Config
 
-	imageName  string
+	ssm        *ssm.Client
 	instanceID string
 }
 
-func NewEC2(ctx context.Context, cfg aws.Config, imageName string, instanceID string) *EC2 {
-	return &EC2{
+func New(ctx context.Context, cfg Config, awsConfig aws.Config, instanceID string) *Runner {
+	return &Runner{
 		ctx:        ctx,
-		ssm:        ssm.NewFromConfig(cfg),
-		imageName:  imageName,
+		cfg:        cfg,
+		ssm:        ssm.NewFromConfig(awsConfig),
 		instanceID: instanceID,
 	}
 }
 
-func (r *EC2) StartGarbageCollector() {
+func (r *Runner) StartGarbageCollector() {
 	zlog.Info().Msg("gc is not implemented for the ec2 runner")
 }
 
-func (r *EC2) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
+func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
 	containerID, err := r.runContainer(ctx, version)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to run container")
 	}
+
+	defer func() {
+		err := r.killContainer(r.ctx, containerID)
+		if err != nil {
+			zlog.Err(err).
+				Str("run_id", runID).
+				Str("container_id", containerID).
+				Msg("failed to kill container")
+		}
+	}()
 
 	output, err := r.runQuery(ctx, containerID, query)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to run query")
 	}
 
-	err = r.killContainer(ctx, containerID)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to kill container")
-	}
-
 	return output, nil
 }
 
-func (r *EC2) sendCommand(ctx context.Context, cmd string) (stdout string, stderr string, err error) {
+func (r *Runner) sendCommand(ctx context.Context, cmd string) (stdout string, stderr string, err error) {
 	sendOutput, err := r.ssm.SendCommand(ctx, &ssm.SendCommandInput{
 		DocumentName: aws.String("AWS-RunShellScript"),
 		InstanceIds:  []string{r.instanceID},
 		Parameters: map[string][]string{
 			"commands": {cmd},
 		},
-		TimeoutSeconds: sendCommandTimeout,
+		TimeoutSeconds: r.cfg.SSMCommandWaitTimeout,
 	})
 	if err != nil {
 		return "", "", errors.Wrap(err, "send failed")
@@ -95,7 +101,7 @@ func (r *EC2) sendCommand(ctx context.Context, cmd string) (stdout string, stder
 		}
 
 		if invocation.Status == ssmtypes.CommandInvocationStatusInProgress {
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(r.cfg.WaitCommandExecutionDelay)
 			continue
 		}
 
@@ -110,10 +116,8 @@ func (r *EC2) sendCommand(ctx context.Context, cmd string) (stdout string, stder
 	}
 }
 
-func (r *EC2) runContainer(ctx context.Context, clickhouseVersion string) (string, error) {
-	// TODO: Fix injection.
-	cmd := fmt.Sprintf("docker run -d --ulimit nofile=262144:262144 -p 8123 %s:%s", r.imageName, clickhouseVersion)
-	stdout, _, err := r.sendCommand(ctx, cmd)
+func (r *Runner) runContainer(ctx context.Context, version string) (string, error) {
+	stdout, _, err := r.sendCommand(ctx, cmdRunContainer(r.cfg.Repository, version))
 	if err != nil {
 		return "", err
 	}
@@ -126,34 +130,30 @@ func (r *EC2) runContainer(ctx context.Context, clickhouseVersion string) (strin
 	return stdout[:idx], nil
 }
 
-func (r *EC2) killContainer(ctx context.Context, id string) error {
-	// TODO: Fix injection.
-	cmd := fmt.Sprintf("docker kill %s", id)
-	_, _, err := r.sendCommand(ctx, cmd)
+func (r *Runner) killContainer(ctx context.Context, id string) error {
+	_, _, err := r.sendCommand(ctx, cmdKillContainer(id))
 
 	return err
 }
 
-func (r *EC2) runQuery(ctx context.Context, containerID string, query string) (string, error) {
-	// TODO: Fix injection.
+func (r *Runner) runQuery(ctx context.Context, containerID string, query string) (string, error) {
 	var stdout string
 	var stderr string
 	var err error
 
-	query = strings.ReplaceAll(query, "\"", "\\\"")
-	cmd := fmt.Sprintf("docker exec %s clickhouse-client -n -m --query \"%s\"", containerID, query) // nolint
+	cmd := cmdRunQuery(containerID, query)
 
-	for retry := 0; retry < 15; retry++ {
+	for retry := 0; retry < r.cfg.MaxSendQueryRetries; retry++ {
 		stdout, stderr, err = r.sendCommand(ctx, cmd)
 		if err != nil {
 			return "", err
 		}
 
-		if !strings.Contains(stderr, "DB::NetException: Connection refused") {
+		if qrunner.CheckIfClickHouseIsReady(stderr) {
 			break
 		}
 
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(r.cfg.SendQueryRetryDelay)
 	}
 
 	if stderr == "" {
