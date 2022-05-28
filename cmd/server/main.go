@@ -69,7 +69,7 @@ func main() {
 	var runner qrunner.Runner
 	switch config.Runner.Type {
 	case RunnerTypeEC2:
-		runner = ec2.NewEC2(ctx, awsConfig, config.DockerImage.Name, config.Runner.EC2.InstanceID)
+		runner = ec2.New(ctx, ec2.DefaultConfig, awsConfig, config.Runner.EC2.InstanceID)
 
 	case RunnerTypeDockerEngine:
 		dockerCli, err := dockercli.NewClientWithOpts(dockercli.WithAPIVersionNegotiation())
@@ -77,7 +77,7 @@ func main() {
 			zlog.Fatal().Err(err).Msg("failed to create docker engine client")
 		}
 
-		localCfg := dockerengine.DefaultDockerEngineConfig
+		localCfg := dockerengine.DefaultConfig
 		localCfg.CustomConfigPath = config.CustomConfigPath
 		localCfg.Repository = config.DockerImage.Name
 		localCfg.GC = nil
