@@ -1,4 +1,4 @@
-package localdocker
+package dockerengine
 
 import (
 	"context"
@@ -48,13 +48,13 @@ func (g *garbageCollector) start() {
 		return
 	}
 
-	zlog.Info().Dur("trigger_frequency", g.cfg.TriggerFrequency).Msg("localdocker gc has been started")
-	defer zlog.Info().Msg("localdocker gc has been finished")
+	zlog.Info().Dur("trigger_frequency", g.cfg.TriggerFrequency).Msg("dockerengine gc has been started")
+	defer zlog.Info().Msg("dockerengine gc has been finished")
 
 	trigger := func() {
 		err := g.trigger()
 		if err != nil {
-			zlog.Err(err).Msg("localdocker gc trigger failed")
+			zlog.Err(err).Msg("dockerengine gc trigger failed")
 		}
 	}
 
@@ -103,7 +103,7 @@ func (g *garbageCollector) trigger() (err error) {
 func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint64, err error) {
 	startedAt := time.Now()
 	defer func() {
-		metrics.LocalDockerGC.ContainersCollected(count, spaceReclaimed, startedAt)
+		metrics.DockerEngineGC.ContainersCollected(count, spaceReclaimed, startedAt)
 	}()
 
 	out, err := g.cli.ContainersPrune(g.ctx, filters.NewArgs(filters.Arg("label", qrunner.LabelOwnership)))
@@ -158,7 +158,7 @@ func (g *garbageCollector) collectImages() (count uint, spaceReclaimed uint64, e
 
 	startedAt := time.Now()
 	defer func() {
-		metrics.LocalDockerGC.ContainersCollected(count, spaceReclaimed, startedAt)
+		metrics.DockerEngineGC.ContainersCollected(count, spaceReclaimed, startedAt)
 	}()
 
 	images, err := g.cli.ImageList(g.ctx, types.ImageListOptions{})

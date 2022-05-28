@@ -19,8 +19,8 @@ const DefaultConfigPath = "config.yaml"
 type RunnerType string
 
 const (
-	RunnerTypeEC2         RunnerType = "EC2"
-	RunnerTypeLocalDocker RunnerType = "LOCAL_DOCKER"
+	RunnerTypeEC2          RunnerType = "EC2"
+	RunnerTypeDockerEngine RunnerType = "DOCKER_ENGINE"
 )
 
 type Config struct {
@@ -62,19 +62,19 @@ type AWS struct {
 type Runner struct {
 	Type RunnerType `mapstructure:"type"`
 
-	EC2         *EC2         `mapstructure:"ec2"`
-	LocalDocker *LocalDocker `mapstructure:"local_docker"`
+	EC2          *EC2          `mapstructure:"ec2"`
+	DockerEngine *DockerEngine `mapstructure:"docker_engine"`
 }
 
 type EC2 struct {
 	InstanceID string `mapstructure:"instance_id"`
 }
 
-type LocalDocker struct {
-	GC *LocalDockerGC `mapstructure:"gc"`
+type DockerEngine struct {
+	GC *DockerEngineGC `mapstructure:"gc"`
 }
 
-type LocalDockerGC struct {
+type DockerEngineGC struct {
 	TriggerFrequency time.Duration `mapstructure:"trigger_frequency"`
 
 	ContainerTTL *time.Duration `mapstructure:"container_ttl"`
@@ -167,8 +167,8 @@ func (c *Config) validate() error {
 			return errors.New("runner.ec2.instance_id is required when runner.type is EC2")
 		}
 
-	case RunnerTypeLocalDocker:
-		gc := c.Runner.LocalDocker.GC
+	case RunnerTypeDockerEngine:
+		gc := c.Runner.DockerEngine.GC
 		if gc == nil {
 			break
 		}
@@ -181,7 +181,7 @@ func (c *Config) validate() error {
 		return errors.New("runner.type is required")
 
 	default:
-		return errors.Errorf("unknown runner type %s (supported: %s, %s)", c.Runner.Type, RunnerTypeEC2, RunnerTypeLocalDocker)
+		return errors.Errorf("unknown runner type %s (supported: %s, %s)", c.Runner.Type, RunnerTypeEC2, RunnerTypeDockerEngine)
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-package localdocker
+package dockerengine
 
 // requestState holds information about a processing query execution request.
 type requestState struct {

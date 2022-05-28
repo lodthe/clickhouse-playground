@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-var LocalDockerGC = newRunnerGCExporter("local_docker")
+var DockerEngineGC = newRunnerGCExporter("docker_engine")
 
 func newRunnerGCExporter(runner string) RunnerGCExporter {
 	runnerLabels := prometheus.Labels{
