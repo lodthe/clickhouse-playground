@@ -38,16 +38,16 @@ aws:
 # custom_config_path: /fast-startup-config.xml
 
 runner:
-  # Available types: EC2, LOCAL_DOCKER.
-  type: LOCAL_DOCKER
+  # Available types: EC2, DOCKER_ENGINE.
+  type: DOCKER_ENGINE
 
   # Required if type is EC2.
   ec2:
     # AWS EC2 instance id used to run queries.
     instance_id: i-023c5bb002bb45ad4
 
-  # Required if type is LOCAL_DOCKER.
-  local_docker:
+  # Required if type is DOCKER_ENGINE.
+  docker_engine:
     # You can configure the garbage collector to prune hanged up containers and images.
     # If the field is missed, gc is disabled.
     # Default: gc is disabled.

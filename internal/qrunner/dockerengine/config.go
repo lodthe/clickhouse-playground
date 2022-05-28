@@ -1,4 +1,4 @@
-package localdocker
+package dockerengine
 
 import "time"
 
@@ -34,7 +34,7 @@ var defaultContainerTTL = 60 * time.Second
 var defaultImageGCCountThreshold = uint(60)
 var defaultImageBufferSize = uint(30)
 
-var DefaultLocalDockerConfig = Config{
+var DefaultDockerEngineConfig = Config{
 	ExecRetryDelay: 200 * time.Millisecond,
 	MaxExecRetries: 20,
 

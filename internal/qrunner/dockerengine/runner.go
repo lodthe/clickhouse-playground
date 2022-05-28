@@ -1,4 +1,4 @@
-package localdocker
+package dockerengine
 
 import (
 	"bytes"
@@ -82,7 +82,7 @@ func (r *Runner) RunQuery(ctx context.Context, runID string, query string, versi
 
 		startedAt := time.Now()
 		defer func() {
-			metrics.LocalDockerPipeline.RemoveContainer(err == nil, "", startedAt)
+			metrics.DockerEnginePipeline.RemoveContainer(err == nil, "", startedAt)
 		}()
 
 		err = r.gc.forceRemoveContainer(state.containerID)
@@ -117,7 +117,7 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 
 	out, err := r.cli.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
-		metrics.LocalDockerPipeline.PullNewImage(false, state.version, startedAt)
+		metrics.DockerEnginePipeline.PullNewImage(false, state.version, startedAt)
 		return errors.Wrap(err, "docker pull failed")
 	}
 
@@ -131,7 +131,7 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 
 	err = r.cli.ImageTag(ctx, imageName, state.chpImageName)
 	if err != nil {
-		metrics.LocalDockerPipeline.PullNewImage(false, state.version, startedAt)
+		metrics.DockerEnginePipeline.PullNewImage(false, state.version, startedAt)
 		zlog.Error().Err(err).
 			Str("run_id", state.runID).
 			Str("source", imageName).
@@ -141,7 +141,7 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 		return errors.Wrap(err, "failed to tag image")
 	}
 
-	metrics.LocalDockerPipeline.PullNewImage(true, state.version, startedAt)
+	metrics.DockerEnginePipeline.PullNewImage(true, state.version, startedAt)
 	zlog.Debug().
 		Str("run_id", state.runID).
 		Dur("elapsed_ms", time.Since(startedAt)).
@@ -156,7 +156,7 @@ func (r *Runner) checkIfImageExists(ctx context.Context, state *requestState) bo
 
 	_, _, err := r.cli.ImageInspectWithRaw(ctx, state.chpImageName)
 	if err == nil {
-		metrics.LocalDockerPipeline.PullExistedImage(true, state.version, startedAt)
+		metrics.DockerEnginePipeline.PullExistedImage(true, state.version, startedAt)
 		zlog.Debug().
 			Dur("elapsed_ms", time.Since(startedAt)).
 			Str("image", state.chpImageName).
@@ -165,7 +165,7 @@ func (r *Runner) checkIfImageExists(ctx context.Context, state *requestState) bo
 		return true
 	}
 	if err != nil && !dockercli.IsErrNotFound(err) {
-		metrics.LocalDockerPipeline.PullExistedImage(false, state.version, startedAt)
+		metrics.DockerEnginePipeline.PullExistedImage(false, state.version, startedAt)
 		zlog.Error().Err(err).Str("image", state.chpImageName).Msg("docker inspect failed")
 	}
 
@@ -176,7 +176,7 @@ func (r *Runner) checkIfImageExists(ctx context.Context, state *requestState) bo
 func (r *Runner) runContainer(ctx context.Context, state *requestState) (err error) {
 	invokedAt := time.Now()
 	defer func() {
-		metrics.LocalDockerPipeline.CreateContainer(err == nil, state.version, invokedAt)
+		metrics.DockerEnginePipeline.CreateContainer(err == nil, state.version, invokedAt)
 	}()
 
 	contConfig := &container.Config{
@@ -223,7 +223,7 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 func (r *Runner) exec(ctx context.Context, state *requestState) (stdout string, stderr string, err error) {
 	invokedAt := time.Now()
 	defer func() {
-		metrics.LocalDockerPipeline.ExecCommand(err == nil, state.version, invokedAt)
+		metrics.DockerEnginePipeline.ExecCommand(err == nil, state.version, invokedAt)
 	}()
 
 	exec, err := r.cli.ContainerExecCreate(ctx, state.containerID, types.ExecConfig{
@@ -268,7 +268,7 @@ func (r *Runner) exec(ctx context.Context, state *requestState) (stdout string, 
 func (r *Runner) runQuery(ctx context.Context, state *requestState) (output string, err error) {
 	invokedAt := time.Now()
 	defer func() {
-		metrics.LocalDockerPipeline.RunQuery(err == nil, state.version, invokedAt)
+		metrics.DockerEnginePipeline.RunQuery(err == nil, state.version, invokedAt)
 	}()
 
 	var stdout string

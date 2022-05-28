@@ -7,14 +7,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-var LocalDockerPipeline = LocalDockerPipelineExporter{
+var DockerEnginePipeline = DockerEnginePipelineExporter{
 	duration: promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: "runner",
 			Name:      "pipeline_step_duration_seconds",
 			Help:      "How long it took to process a runner pipeline step, partitioned by step name, database version and status (success or failure).",
 			ConstLabels: prometheus.Labels{
-				"runner": "local_docker",
+				"runner": "docker_engine",
 			},
 			Buckets: []float64{.01, .05, .1, .25, .5, 1, 2.5, 5, 10, 15, 30},
 		},
@@ -22,11 +22,11 @@ var LocalDockerPipeline = LocalDockerPipelineExporter{
 	),
 }
 
-type LocalDockerPipelineExporter struct {
+type DockerEnginePipelineExporter struct {
 	duration *prometheus.HistogramVec
 }
 
-func (r *LocalDockerPipelineExporter) observe(step string, succeed bool, version string, startedAt time.Time) {
+func (r *DockerEnginePipelineExporter) observe(step string, succeed bool, version string, startedAt time.Time) {
 	status := "success"
 	if !succeed {
 		status = "failure"
@@ -41,26 +41,26 @@ func (r *LocalDockerPipelineExporter) observe(step string, succeed bool, version
 		Observe(time.Since(startedAt).Seconds())
 }
 
-func (r *LocalDockerPipelineExporter) PullExistedImage(succeed bool, version string, startedAt time.Time) {
+func (r *DockerEnginePipelineExporter) PullExistedImage(succeed bool, version string, startedAt time.Time) {
 	r.observe("pull_existed_image", succeed, version, startedAt)
 }
 
-func (r *LocalDockerPipelineExporter) PullNewImage(succeed bool, version string, startedAt time.Time) {
+func (r *DockerEnginePipelineExporter) PullNewImage(succeed bool, version string, startedAt time.Time) {
 	r.observe("pull_new_image", succeed, version, startedAt)
 }
 
-func (r *LocalDockerPipelineExporter) CreateContainer(succeed bool, version string, startedAt time.Time) {
+func (r *DockerEnginePipelineExporter) CreateContainer(succeed bool, version string, startedAt time.Time) {
 	r.observe("create_container", succeed, version, startedAt)
 }
 
-func (r *LocalDockerPipelineExporter) ExecCommand(succeed bool, version string, startedAt time.Time) {
+func (r *DockerEnginePipelineExporter) ExecCommand(succeed bool, version string, startedAt time.Time) {
 	r.observe("exec_command", succeed, version, startedAt)
 }
 
-func (r *LocalDockerPipelineExporter) RunQuery(succeed bool, version string, startedAt time.Time) {
+func (r *DockerEnginePipelineExporter) RunQuery(succeed bool, version string, startedAt time.Time) {
 	r.observe("run_query", succeed, version, startedAt)
 }
 
-func (r *LocalDockerPipelineExporter) RemoveContainer(succeed bool, version string, startedAt time.Time) {
+func (r *DockerEnginePipelineExporter) RemoveContainer(succeed bool, version string, startedAt time.Time) {
 	r.observe("remove_container", succeed, version, startedAt)
 }

@@ -10,8 +10,8 @@ import (
 
 	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/qrunner"
+	"clickhouse-playground/internal/qrunner/dockerengine"
 	"clickhouse-playground/internal/qrunner/ec2"
-	"clickhouse-playground/internal/qrunner/localdocker"
 	"clickhouse-playground/internal/queryrun"
 	"clickhouse-playground/pkg/dockerhub"
 	api "clickhouse-playground/pkg/restapi"
@@ -71,20 +71,20 @@ func main() {
 	case RunnerTypeEC2:
 		runner = ec2.NewEC2(ctx, awsConfig, config.DockerImage.Name, config.Runner.EC2.InstanceID)
 
-	case RunnerTypeLocalDocker:
+	case RunnerTypeDockerEngine:
 		dockerCli, err := dockercli.NewClientWithOpts(dockercli.WithAPIVersionNegotiation())
 		if err != nil {
 			zlog.Fatal().Err(err).Msg("failed to create docker engine client")
 		}
 
-		localCfg := localdocker.DefaultLocalDockerConfig
+		localCfg := dockerengine.DefaultDockerEngineConfig
 		localCfg.CustomConfigPath = config.CustomConfigPath
 		localCfg.Repository = config.DockerImage.Name
 		localCfg.GC = nil
 
-		gc := config.Runner.LocalDocker.GC
+		gc := config.Runner.DockerEngine.GC
 		if gc != nil {
-			localCfg.GC = &localdocker.GCConfig{
+			localCfg.GC = &dockerengine.GCConfig{
 				TriggerFrequency:      gc.TriggerFrequency,
 				ContainerTTL:          gc.ContainerTTL,
 				ImageGCCountThreshold: gc.ImageGCCountThreshold,
@@ -92,7 +92,7 @@ func main() {
 			}
 		}
 
-		runner = localdocker.New(ctx, localCfg, dockerCli, tagStorage)
+		runner = dockerengine.New(ctx, localCfg, dockerCli, tagStorage)
 
 	default:
 		zlog.Fatal().Msg("invalid runner")
