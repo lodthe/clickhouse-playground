@@ -20,20 +20,30 @@ import (
 // The provided AWS config must be authorized to execute commands on the specified EC2 instance. Furthermore,
 // you have to start the SSM daemon on the server.
 type Runner struct {
-	ctx context.Context
-	cfg Config
+	ctx  context.Context
+	name string
+	cfg  Config
 
 	ssm        *ssm.Client
 	instanceID string
 }
 
-func New(ctx context.Context, cfg Config, awsConfig aws.Config, instanceID string) *Runner {
+func New(ctx context.Context, name string, cfg Config, awsConfig aws.Config, instanceID string) *Runner {
 	return &Runner{
 		ctx:        ctx,
+		name:       name,
 		cfg:        cfg,
 		ssm:        ssm.NewFromConfig(awsConfig),
 		instanceID: instanceID,
 	}
+}
+
+func (r *Runner) Type() qrunner.Type {
+	return qrunner.TypeEC2
+}
+
+func (r *Runner) Name() string {
+	return r.name
 }
 
 func (r *Runner) StartGarbageCollector() {
