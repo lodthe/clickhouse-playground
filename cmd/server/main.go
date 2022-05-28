@@ -69,7 +69,7 @@ func main() {
 	var runner qrunner.Runner
 	switch config.Runner.Type {
 	case RunnerTypeEC2:
-		runner = ec2.New(ctx, ec2.DefaultConfig, awsConfig, config.Runner.EC2.InstanceID)
+		runner = ec2.New(ctx, "default_ec2", ec2.DefaultConfig, awsConfig, config.Runner.EC2.InstanceID)
 
 	case RunnerTypeDockerEngine:
 		dockerCli, err := dockercli.NewClientWithOpts(dockercli.WithAPIVersionNegotiation())
@@ -92,7 +92,7 @@ func main() {
 			}
 		}
 
-		runner = dockerengine.New(ctx, localCfg, dockerCli, tagStorage)
+		runner = dockerengine.New(ctx, "default_docker_engine", localCfg, dockerCli, tagStorage)
 
 	default:
 		zlog.Fatal().Msg("invalid runner")

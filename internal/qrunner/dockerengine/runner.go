@@ -30,22 +30,32 @@ type ImageTagStorage interface {
 // This runner can start instances on arbitrary type of server, even on the same server where the coordinator
 // is started. The main requirement is the running Docker daemon and granted access to it.
 type Runner struct {
-	ctx context.Context
-	cfg Config
+	ctx  context.Context
+	name string
+	cfg  Config
 
 	cli        *dockercli.Client
 	tagStorage ImageTagStorage
 	gc         *garbageCollector
 }
 
-func New(ctx context.Context, cfg Config, cli *dockercli.Client, tagStorage ImageTagStorage) *Runner {
+func New(ctx context.Context, name string, cfg Config, cli *dockercli.Client, tagStorage ImageTagStorage) *Runner {
 	return &Runner{
 		ctx:        ctx,
+		name:       name,
 		cfg:        cfg,
 		cli:        cli,
 		tagStorage: tagStorage,
 		gc:         newGarbageCollector(ctx, cfg.GC, cfg.Repository, cli),
 	}
+}
+
+func (r *Runner) Type() qrunner.Type {
+	return qrunner.TypeEC2
+}
+
+func (r *Runner) Name() string {
+	return r.name
 }
 
 // StartGarbageCollector triggers periodically the garbage collector
