@@ -21,6 +21,9 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -43,5 +46,5 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64
-          tags: latest,${{ steps.meta.outputs.tags }}
+          tags: lodthe/clickhouse-playground:latest,${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
