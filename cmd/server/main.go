@@ -79,6 +79,7 @@ func main() {
 
 		localCfg := localdocker.DefaultLocalDockerConfig
 		localCfg.CustomConfigPath = config.CustomConfigPath
+		localCfg.Repository = config.DockerImage.Name
 		localCfg.GC = nil
 
 		gc := config.Runner.LocalDocker.GC
@@ -91,7 +92,7 @@ func main() {
 			}
 		}
 
-		runner = localdocker.New(ctx, localCfg, dockerCli, config.DockerImage.Name, tagStorage)
+		runner = localdocker.New(ctx, localCfg, dockerCli, tagStorage)
 
 	default:
 		zlog.Fatal().Msg("invalid runner")

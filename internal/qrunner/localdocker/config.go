@@ -3,6 +3,8 @@ package localdocker
 import "time"
 
 type Config struct {
+	Repository string
+
 	ExecRetryDelay time.Duration
 	MaxExecRetries int
 

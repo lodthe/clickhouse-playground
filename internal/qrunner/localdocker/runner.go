@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"sort"
 	"strings"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	dockercli "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -34,29 +32,18 @@ type Runner struct {
 	ctx context.Context
 	cfg Config
 
-	repository string
-
 	cli        *dockercli.Client
 	tagStorage ImageTagStorage
+	gc         *garbageCollector
 }
 
-func New(ctx context.Context, cfg Config, cli *dockercli.Client, repository string, tagStorage ImageTagStorage) *Runner {
+func New(ctx context.Context, cfg Config, cli *dockercli.Client, tagStorage ImageTagStorage) *Runner {
 	return &Runner{
 		ctx:        ctx,
 		cfg:        cfg,
 		cli:        cli,
-		repository: repository,
 		tagStorage: tagStorage,
-	}
-}
-
-func (r *Runner) isStopped() bool {
-	select {
-	case <-r.ctx.Done():
-		return true
-
-	default:
-		return false
+		gc:         newGarbageCollector(ctx, cfg.GC, cfg.Repository, cli),
 	}
 }
 
@@ -64,203 +51,7 @@ func (r *Runner) isStopped() bool {
 // to prune infrequently used images and hanged up containers.
 // Trigger frequency, image and container TTL, and other gc are configured in Config.
 func (r *Runner) StartGarbageCollector() {
-	cfg := r.cfg.GC
-	if cfg == nil {
-		zlog.Info().Msg("localdocker gc is disabled due to a missed configuration")
-		return
-	}
-
-	zlog.Info().Dur("trigger_frequency", cfg.TriggerFrequency).Msg("localdocker gc has been started")
-	defer zlog.Info().Msg("localdocker gc has been finished")
-
-	trigger := func() {
-		err := r.triggerGC()
-		if err != nil {
-			zlog.Err(err).Msg("localdocker gc trigger failed")
-		}
-	}
-
-	trigger()
-
-	t := time.NewTicker(cfg.TriggerFrequency)
-
-	for {
-		select {
-		case <-r.ctx.Done():
-			return
-
-		case <-t.C:
-		}
-
-		trigger()
-	}
-}
-
-func (r *Runner) triggerGC() (err error) {
-	if r.isStopped() {
-		return nil
-	}
-
-	_, _, err = r.triggerContainersGC()
-	if err != nil {
-		return errors.Wrap(err, "containers gc failed")
-	}
-
-	if r.isStopped() {
-		return nil
-	}
-
-	_, _, err = r.triggerImagesGC()
-	if err != nil {
-		return errors.Wrap(err, "images gc failed")
-	}
-
-	zlog.Debug().Msg("gc finished")
-
-	return nil
-}
-
-// triggerContainersGC prunes exited containers and force removes hanged up containers.
-// A container is hanged up if it has been alive at least for GCConfig.ContainerTTL.
-func (r *Runner) triggerContainersGC() (count uint, spaceReclaimed uint64, err error) {
-	startedAt := time.Now()
-	defer func() {
-		metrics.LocalDockerGC.ContainersCollected(count, spaceReclaimed, startedAt)
-	}()
-
-	out, err := r.cli.ContainersPrune(r.ctx, filters.NewArgs(filters.Arg("label", qrunner.LabelOwnership)))
-	if err != nil {
-		return 0, 0, errors.Wrap(err, "failed to prune stopped containers")
-	}
-
-	count += uint(len(out.ContainersDeleted))
-	spaceReclaimed += out.SpaceReclaimed
-
-	if r.cfg.GC.ContainerTTL == nil {
-		return count, spaceReclaimed, nil
-	}
-	zlog.With()
-
-	// Find hanged up containers and force remove them.
-	containers, err := r.cli.ContainerList(r.ctx, types.ContainerListOptions{
-		Size:    true,
-		All:     true,
-		Limit:   -1,
-		Filters: filters.NewArgs(filters.Arg("label", qrunner.LabelOwnership)),
-	})
-	if err != nil {
-		return count, spaceReclaimed, errors.Wrap(err, "failed to list containers")
-	}
-
-	for _, c := range containers {
-		deadline := time.Unix(c.Created, 0).Add(*r.cfg.GC.ContainerTTL)
-		if time.Now().Before(deadline) {
-			continue
-		}
-
-		err = r.forceRemoveContainer(c.ID)
-		if err != nil {
-			zlog.Error().Err(err).Str("container_id", c.ID).Msg("containers gc failed to remove container")
-			continue
-		}
-
-		count++
-		spaceReclaimed += uint64(c.SizeRw)
-	}
-
-	return count, spaceReclaimed, nil
-}
-
-// triggerImagesGC frees the disk by removing most recently tagged images.
-// If there are at least GCConfig.ImageGCCountThreshold downloaded chp images, it leaves GCConfig.ImageBufferSize
-// least recently tagged images and removes the others.
-func (r *Runner) triggerImagesGC() (count uint, spaceReclaimed uint64, err error) {
-	if r.cfg.GC.ImageGCCountThreshold == nil {
-		return 0, 0, nil
-	}
-
-	startedAt := time.Now()
-	defer func() {
-		metrics.LocalDockerGC.ContainersCollected(count, spaceReclaimed, startedAt)
-	}()
-
-	images, err := r.cli.ImageList(r.ctx, types.ImageListOptions{})
-	if err != nil {
-		return 0, 0, errors.Wrap(err, "failed to list images")
-	}
-
-	// Find all images with chp tags.
-	var candidates []types.ImageSummary
-	for _, img := range images {
-		var matched bool
-		for _, tag := range img.RepoTags {
-			if qrunner.IsPlaygroundImageName(tag, r.repository) {
-				matched = true
-				break
-			}
-		}
-
-		if !matched {
-			continue
-		}
-
-		candidates = append(candidates, img)
-	}
-
-	if len(candidates) < int(*r.cfg.GC.ImageGCCountThreshold) {
-		return 0, 0, nil
-	}
-
-	detailed := make([]types.ImageInspect, 0, len(candidates))
-	for _, c := range candidates {
-		inspect, _, err := r.cli.ImageInspectWithRaw(r.ctx, c.ID)
-		if err != nil {
-			zlog.Err(err).Str("image_id", c.ID).Msg("docker image inspect failed")
-			continue
-		}
-
-		detailed = append(detailed, inspect)
-	}
-
-	// Drop N least recently tagged images.
-	sort.Slice(detailed, func(i, j int) bool {
-		return detailed[i].Metadata.LastTagTime.Before(detailed[j].Metadata.LastTagTime)
-	})
-
-	if len(detailed) > int(r.cfg.GC.ImageBufferSize) {
-		count, spaceReclaimed = r.removeImages(detailed[int(r.cfg.GC.ImageBufferSize):])
-	}
-
-	return count, spaceReclaimed, nil
-}
-
-func (r *Runner) removeImages(images []types.ImageInspect) (count uint, spaceReclaimed uint64) {
-	// Try to remove images.
-	for _, img := range images {
-		ok := true
-		for _, tag := range img.RepoTags {
-			_, err := r.cli.ImageRemove(r.ctx, tag, types.ImageRemoveOptions{
-				PruneChildren: true,
-			})
-			if err != nil {
-				zlog.Err(err).Str("image_id", img.ID).Msg("failed to delete image tag")
-				ok = false
-
-				continue
-			}
-		}
-
-		if !ok {
-			continue
-		}
-
-		zlog.Debug().Str("id", img.ID).Strs("tags", img.RepoTags).Msg("image has been removed")
-
-		count++
-		spaceReclaimed += uint64(img.Size)
-	}
-
-	return count, spaceReclaimed
+	r.gc.start()
 }
 
 func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
@@ -289,7 +80,12 @@ func (r *Runner) RunQuery(ctx context.Context, runID string, query string, versi
 		case <-done:
 		}
 
-		err = r.forceRemoveContainer(state.containerID)
+		startedAt := time.Now()
+		defer func() {
+			metrics.LocalDockerPipeline.RemoveContainer(err == nil, "", startedAt)
+		}()
+
+		err = r.gc.forceRemoveContainer(state.containerID)
 		if err != nil {
 			zlog.Error().Err(err).Str("run_id", state.runID).Msg("failed to kill container")
 		}
@@ -306,14 +102,14 @@ func (r *Runner) RunQuery(ctx context.Context, runID string, query string, versi
 // pull checks whether the requested image exists. If no, it will be downloaded and renamed to hashed-name.
 func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 	startedAt := time.Now()
-	imageName := qrunner.FullImageName(r.repository, state.version)
+	imageName := qrunner.FullImageName(r.cfg.Repository, state.version)
 
 	tag := r.tagStorage.Get(state.version)
 	if tag == nil {
 		return errors.New("version not found")
 	}
 
-	state.chpImageName = qrunner.PlaygroundImageName(r.repository, tag.Digest)
+	state.chpImageName = qrunner.PlaygroundImageName(r.cfg.Repository, tag.Digest)
 
 	if r.checkIfImageExists(ctx, state) {
 		return nil
@@ -505,23 +301,4 @@ func (r *Runner) runQuery(ctx context.Context, state *requestState) (output stri
 // When the instance is not ready, we received the 'Connection refused' exception.
 func (r *Runner) checkIfQueryExecuted(_, stderr string) bool {
 	return !strings.Contains(stderr, "DB::NetException: Connection refused")
-}
-
-func (r *Runner) forceRemoveContainer(id string) (err error) {
-	invokedAt := time.Now()
-	defer func() {
-		metrics.LocalDockerPipeline.RemoveContainer(err == nil, "", invokedAt)
-	}()
-
-	err = r.cli.ContainerRemove(r.ctx, id, types.ContainerRemoveOptions{
-		RemoveVolumes: true,
-		Force:         true,
-	})
-	if err != nil {
-		return err
-	}
-
-	zlog.Debug().Str("container_id", id).Msg("container has been force removed")
-
-	return nil
 }
