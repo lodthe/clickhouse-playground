@@ -101,9 +101,7 @@ func (r *Runner) triggerGC() (err error) {
 		return nil
 	}
 
-	startedAt := time.Now()
-
-	err = r.triggerContainersGC()
+	_, _, err = r.triggerContainersGC()
 	if err != nil {
 		return errors.Wrap(err, "containers gc failed")
 	}
@@ -112,30 +110,36 @@ func (r *Runner) triggerGC() (err error) {
 		return nil
 	}
 
-	err = r.triggerImagesGC()
+	_, _, err = r.triggerImagesGC()
 	if err != nil {
 		return errors.Wrap(err, "images gc failed")
 	}
 
-	zlog.Info().Dur("elapsed_ms", time.Since(startedAt)).Msg("gc finished")
+	zlog.Debug().Msg("gc finished")
 
 	return nil
 }
 
-func (r *Runner) triggerContainersGC() error {
-	pruneOut, err := r.cli.ContainersPrune(r.ctx, filters.NewArgs(filters.Arg("label", qrunner.LabelOwnership)))
+// triggerContainersGC prunes exited containers and force removes hanged up containers.
+// A container is hanged up if it has been alive at least for GCConfig.ContainerTTL.
+func (r *Runner) triggerContainersGC() (count uint, spaceReclaimed uint64, err error) {
+	startedAt := time.Now()
+	defer func() {
+		metrics.LocalDockerGC.ContainersCollected(count, spaceReclaimed, startedAt)
+	}()
+
+	out, err := r.cli.ContainersPrune(r.ctx, filters.NewArgs(filters.Arg("label", qrunner.LabelOwnership)))
 	if err != nil {
-		return errors.Wrap(err, "failed to prune stopped containers")
+		return 0, 0, errors.Wrap(err, "failed to prune stopped containers")
 	}
 
-	zlog.Info().
-		Uint64("space_reclaimed_bytes", pruneOut.SpaceReclaimed).
-		Int("container_count", len(pruneOut.ContainersDeleted)).
-		Msg("stopped containers have been deleted")
+	count += uint(len(out.ContainersDeleted))
+	spaceReclaimed += out.SpaceReclaimed
 
 	if r.cfg.GC.ContainerTTL == nil {
-		return nil
+		return count, spaceReclaimed, nil
 	}
+	zlog.With()
 
 	// Find hanged up containers and force remove them.
 	containers, err := r.cli.ContainerList(r.ctx, types.ContainerListOptions{
@@ -145,11 +149,9 @@ func (r *Runner) triggerContainersGC() error {
 		Filters: filters.NewArgs(filters.Arg("label", qrunner.LabelOwnership)),
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to list containers")
+		return count, spaceReclaimed, errors.Wrap(err, "failed to list containers")
 	}
 
-	var count uint
-	var reclaimedSpace int64
 	for _, c := range containers {
 		deadline := time.Unix(c.Created, 0).Add(*r.cfg.GC.ContainerTTL)
 		if time.Now().Before(deadline) {
@@ -163,28 +165,28 @@ func (r *Runner) triggerContainersGC() error {
 		}
 
 		count++
-		reclaimedSpace += c.SizeRw
+		spaceReclaimed += uint64(c.SizeRw)
 	}
 
-	zlog.Info().
-		Int64("space_reclaimed_bytes", reclaimedSpace).
-		Uint("container_count", count).
-		Msg("hanged up containers have been stopped")
-
-	return nil
+	return count, spaceReclaimed, nil
 }
 
-// triggerImagesGC tries to clean the space by removing most recently tagged images.
+// triggerImagesGC frees the disk by removing most recently tagged images.
 // If there are at least GCConfig.ImageGCCountThreshold downloaded chp images, it leaves GCConfig.ImageBufferSize
 // least recently tagged images and removes the others.
-func (r *Runner) triggerImagesGC() error {
+func (r *Runner) triggerImagesGC() (count uint, spaceReclaimed uint64, err error) {
 	if r.cfg.GC.ImageGCCountThreshold == nil {
-		return nil
+		return 0, 0, nil
 	}
+
+	startedAt := time.Now()
+	defer func() {
+		metrics.LocalDockerGC.ContainersCollected(count, spaceReclaimed, startedAt)
+	}()
 
 	images, err := r.cli.ImageList(r.ctx, types.ImageListOptions{})
 	if err != nil {
-		return errors.Wrap(err, "failed to list images")
+		return 0, 0, errors.Wrap(err, "failed to list images")
 	}
 
 	// Find all images with chp tags.
@@ -206,7 +208,7 @@ func (r *Runner) triggerImagesGC() error {
 	}
 
 	if len(candidates) < int(*r.cfg.GC.ImageGCCountThreshold) {
-		return nil
+		return 0, 0, nil
 	}
 
 	detailed := make([]types.ImageInspect, 0, len(candidates))
@@ -226,37 +228,39 @@ func (r *Runner) triggerImagesGC() error {
 	})
 
 	if len(detailed) > int(r.cfg.GC.ImageBufferSize) {
-		r.removeImages(detailed[int(r.cfg.GC.ImageBufferSize):])
+		count, spaceReclaimed = r.removeImages(detailed[int(r.cfg.GC.ImageBufferSize):])
 	}
 
-	return nil
+	return count, spaceReclaimed, nil
 }
 
-func (r *Runner) removeImages(images []types.ImageInspect) {
+func (r *Runner) removeImages(images []types.ImageInspect) (count uint, spaceReclaimed uint64) {
 	// Try to remove images.
-	var count uint
-	var reclaimedSpace int64
 	for _, img := range images {
+		ok := true
 		for _, tag := range img.RepoTags {
 			_, err := r.cli.ImageRemove(r.ctx, tag, types.ImageRemoveOptions{
 				PruneChildren: true,
 			})
 			if err != nil {
 				zlog.Err(err).Str("image_id", img.ID).Msg("failed to delete image tag")
+				ok = false
+
 				continue
 			}
 		}
 
-		zlog.Trace().Str("id", img.ID).Strs("tags", img.RepoTags).Msg("image has been removed")
+		if !ok {
+			continue
+		}
+
+		zlog.Debug().Str("id", img.ID).Strs("tags", img.RepoTags).Msg("image has been removed")
 
 		count++
-		reclaimedSpace += img.Size
+		spaceReclaimed += uint64(img.Size)
 	}
 
-	zlog.Info().
-		Int64("space_reclaimed_bytes", reclaimedSpace).
-		Uint("removed_image_count", count).
-		Msg("images have been pruned")
+	return count, spaceReclaimed
 }
 
 func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
@@ -327,7 +331,7 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 		zlog.Error().Err(err).Str("image", imageName).Msg("failed to read pull output")
 	}
 
-	zlog.Trace().Str("image", imageName).Str("output", string(output)).Msg("base image has been pulled")
+	zlog.Debug().Str("image", imageName).Str("output", string(output)).Msg("base image has been pulled")
 
 	err = r.cli.ImageTag(ctx, imageName, state.chpImageName)
 	if err != nil {
@@ -517,7 +521,7 @@ func (r *Runner) forceRemoveContainer(id string) (err error) {
 		return err
 	}
 
-	zlog.Trace().Str("container_id", id).Msg("container has been force removed")
+	zlog.Debug().Str("container_id", id).Msg("container has been force removed")
 
 	return nil
 }
