@@ -72,7 +72,7 @@ linters:
     - godox
     - gofmt
     - goimports
-    - golint
+    - revive
     - gosec
     - nakedret
     - exportloopref
@@ -95,7 +95,6 @@ issues:
       linters:
         - gomnd
         - gocritic
-        - golint
         - gosec
         - unparam
 

@@ -61,6 +61,7 @@ type AWS struct {
 
 type Runner struct {
 	Type RunnerType `mapstructure:"type"`
+	Name string     `mapstructure:"name"`
 
 	EC2          *EC2          `mapstructure:"ec2"`
 	DockerEngine *DockerEngine `mapstructure:"docker_engine"`
@@ -81,6 +82,40 @@ type DockerEngineGC struct {
 
 	ImageGCCountThreshold *uint `mapstructure:"image_count_threshold"`
 	ImageBufferSize       uint  `mapstructure:"image_buffer_size"`
+}
+
+func (r *Runner) Validate() error {
+	if r.Name == "" {
+		return errors.New("runner.name is required")
+	}
+
+	switch r.Type {
+	case RunnerTypeEC2:
+		if r.EC2 == nil {
+			return errors.New("runner.ec2 is required when runner.type is EC2")
+		}
+		if r.EC2.InstanceID == "" {
+			return errors.New("runner.ec2.instance_id is required when runner.type is EC2")
+		}
+
+	case RunnerTypeDockerEngine:
+		gc := r.DockerEngine.GC
+		if gc == nil {
+			break
+		}
+
+		if gc.TriggerFrequency == 0 {
+			gc.TriggerFrequency = 1 * time.Minute
+		}
+
+	case "":
+		return errors.New("runner.type is required")
+
+	default:
+		return errors.Errorf("unknown runner type %s (supported: %s, %s)", r.Type, RunnerTypeEC2, RunnerTypeDockerEngine)
+	}
+
+	return nil
 }
 
 func LoadConfig() (*Config, error) {
@@ -158,30 +193,9 @@ func (c *Config) validate() error {
 		return errors.New("aws.query_runs_table is required")
 	}
 
-	switch c.Runner.Type {
-	case RunnerTypeEC2:
-		if c.Runner.EC2 == nil {
-			return errors.New("runner.ec2 is required when runner.type is EC2")
-		}
-		if c.Runner.EC2.InstanceID == "" {
-			return errors.New("runner.ec2.instance_id is required when runner.type is EC2")
-		}
-
-	case RunnerTypeDockerEngine:
-		gc := c.Runner.DockerEngine.GC
-		if gc == nil {
-			break
-		}
-
-		if gc.TriggerFrequency == 0 {
-			gc.TriggerFrequency = 1 * time.Minute
-		}
-
-	case "":
-		return errors.New("runner.type is required")
-
-	default:
-		return errors.Errorf("unknown runner type %s (supported: %s, %s)", c.Runner.Type, RunnerTypeEC2, RunnerTypeDockerEngine)
+	err := c.Runner.Validate()
+	if err != nil {
+		return errors.Wrap(err, "runner validation")
 	}
 
 	return nil
