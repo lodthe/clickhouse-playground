@@ -49,6 +49,33 @@ runner:
 
   # Required if type is DOCKER_ENGINE.
   docker_engine:
+    # [OPTIONAL] You can provide an SSH Docker Daemon URL to start containers remotely.
+    # Specified URL must start with "ssh://" and should be a valid SSH connection URL. It's like
+    # when you connect to a server via SSH and type "ssh user@host:port".
+    # To get the same effect, you should set daemon_url to "ssh://user@host:port".
+    #
+    # The playground just executes the ssh binary with the specified URL. Keep in mind the following points,
+    # especially if you are running the playground in a Docker container:
+    #
+    # 1) There is must be the ssh executable in the running system, and it must be available
+    #    for playground to run it. Usually, you can install the openssh package to get the ssh executable.
+    # 2) You can specify a shorthand SSH host in a SSH config (~/.ssh/config or /etc/ssh/ssh_config)
+    #    and use it.
+    #
+    #    For example, if you have the following configuration
+    #    ---
+    #    Host playground-1
+    #	   HostName playground-1.example.com
+    #	   User lodthe
+    #	   Port 22
+    #	   IdentityFile ~/.ssh/playground_1.pem
+    #   ---
+    #   you can set daemon_url to "playground-1", and it will work correctly!
+    #
+    #
+    # Default: local "unix:///var/run/docker.sock" is used.
+    # daemon_url: ssh://clickhouse-playground
+
     # You can configure the garbage collector to prune hanged up containers and images.
     # If the field is missed, gc is disabled.
     # Default: gc is disabled.

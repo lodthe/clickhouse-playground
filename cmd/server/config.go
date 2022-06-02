@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 	"time"
 
 	"clickhouse-playground/internal/dockertag"
@@ -72,7 +73,8 @@ type EC2 struct {
 }
 
 type DockerEngine struct {
-	GC *DockerEngineGC `mapstructure:"gc"`
+	DaemonURL *string         `mapstructure:"daemon_url"`
+	GC        *DockerEngineGC `mapstructure:"gc"`
 }
 
 type DockerEngineGC struct {
@@ -106,6 +108,11 @@ func (r *Runner) Validate() error {
 
 		if gc.TriggerFrequency == 0 {
 			gc.TriggerFrequency = 1 * time.Minute
+		}
+
+		daemonURL := r.DockerEngine.DaemonURL
+		if daemonURL != nil && !strings.HasPrefix(*daemonURL, "ssh://") {
+			return errors.Errorf("runner.docker_daemon.daemon_url must be empty or start with 'ssh://', but %s found", *daemonURL)
 		}
 
 	case "":

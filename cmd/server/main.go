@@ -16,9 +16,12 @@ import (
 	"clickhouse-playground/pkg/dockerhub"
 	api "clickhouse-playground/pkg/restapi"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconf "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/docker/cli/cli/connhelper"
 	dockercli "github.com/docker/docker/client"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
@@ -69,30 +72,13 @@ func main() {
 	var runner qrunner.Runner
 	switch config.Runner.Type {
 	case RunnerTypeEC2:
-		runner = ec2.New(ctx, config.Runner.Name, ec2.DefaultConfig, awsConfig, config.Runner.EC2.InstanceID)
+		runner = newEC2Runner(ctx, &config.Runner, awsConfig)
 
 	case RunnerTypeDockerEngine:
-		dockerCli, err := dockercli.NewClientWithOpts(dockercli.WithAPIVersionNegotiation())
+		runner, err = newDockerEngineRunner(ctx, config, tagStorage)
 		if err != nil {
-			zlog.Fatal().Err(err).Msg("failed to create docker engine client")
+			zlog.Fatal().Err(err).Msg("failed to create docker engine runner")
 		}
-
-		localCfg := dockerengine.DefaultConfig
-		localCfg.CustomConfigPath = config.CustomConfigPath
-		localCfg.Repository = config.DockerImage.Name
-		localCfg.GC = nil
-
-		gc := config.Runner.DockerEngine.GC
-		if gc != nil {
-			localCfg.GC = &dockerengine.GCConfig{
-				TriggerFrequency:      gc.TriggerFrequency,
-				ContainerTTL:          gc.ContainerTTL,
-				ImageGCCountThreshold: gc.ImageGCCountThreshold,
-				ImageBufferSize:       gc.ImageBufferSize,
-			}
-		}
-
-		runner = dockerengine.New(ctx, config.Runner.Name, localCfg, dockerCli, tagStorage)
 
 	default:
 		zlog.Fatal().Msg("invalid runner")
@@ -139,4 +125,69 @@ func main() {
 	if err != nil {
 		zlog.Error().Err(err).Msg("server shutdown failed")
 	}
+}
+
+func newEC2Runner(ctx context.Context, config *Runner, awsConfig aws.Config) *ec2.Runner {
+	return ec2.New(ctx, config.Name, ec2.DefaultConfig, awsConfig, config.EC2.InstanceID)
+}
+
+func newDockerEngineRunner(ctx context.Context, config *Config, tagStorage *dockertag.Cache) (*dockerengine.Runner, error) {
+	opts, err := getDockerEngineOpts(config.Runner.DockerEngine)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build options for Docker client")
+	}
+
+	dockerCli, err := dockercli.NewClientWithOpts(opts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create Docker client")
+	}
+
+	localCfg := dockerengine.DefaultConfig
+	localCfg.CustomConfigPath = config.CustomConfigPath
+	localCfg.Repository = config.DockerImage.Name
+	localCfg.GC = nil
+
+	gc := config.Runner.DockerEngine.GC
+	if gc != nil {
+		localCfg.GC = &dockerengine.GCConfig{
+			TriggerFrequency:      gc.TriggerFrequency,
+			ContainerTTL:          gc.ContainerTTL,
+			ImageGCCountThreshold: gc.ImageGCCountThreshold,
+			ImageBufferSize:       gc.ImageBufferSize,
+		}
+	}
+
+	return dockerengine.New(ctx, config.Runner.Name, localCfg, dockerCli, tagStorage), nil
+}
+
+func getDockerEngineOpts(config *DockerEngine) ([]dockercli.Opt, error) {
+	opts := []dockercli.Opt{
+		dockercli.WithAPIVersionNegotiation(),
+	}
+
+	if config.DaemonURL == nil {
+		return opts, nil
+	}
+
+	helper, err := connhelper.GetConnectionHelper(*config.DaemonURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create ssh connection")
+	}
+	if helper == nil {
+		return nil, errors.Wrap(err, "provided daemon_url cannot be recognized by Docker lib")
+	}
+
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: helper.Dialer,
+		},
+	}
+
+	opts = append(opts,
+		dockercli.WithHTTPClient(httpClient),
+		dockercli.WithHost(helper.Host),
+		dockercli.WithDialContext(helper.Dialer),
+	)
+
+	return opts, nil
 }
