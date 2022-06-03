@@ -8,5 +8,11 @@ type Runner interface {
 	Type() Type
 	Name() string
 	RunQuery(ctx context.Context, runID string, query string, version string) (string, error)
-	StartGarbageCollector()
+
+	// Start initializes background processes (like garbage collection and status exporter).
+	// This function is non-blocking.
+	Start() error
+
+	// Stop stops background tasks and waits for their finish.
+	Stop() error
 }

@@ -20,7 +20,9 @@ import (
 // The provided AWS config must be authorized to execute commands on the specified EC2 instance. Furthermore,
 // you have to start the SSM daemon on the server.
 type Runner struct {
-	ctx  context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	name string
 	cfg  Config
 
@@ -29,8 +31,11 @@ type Runner struct {
 }
 
 func New(ctx context.Context, name string, cfg Config, awsConfig aws.Config, instanceID string) *Runner {
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &Runner{
 		ctx:        ctx,
+		cancel:     cancel,
 		name:       name,
 		cfg:        cfg,
 		ssm:        ssm.NewFromConfig(awsConfig),
@@ -46,8 +51,16 @@ func (r *Runner) Name() string {
 	return r.name
 }
 
-func (r *Runner) StartGarbageCollector() {
-	zlog.Info().Msg("gc is not implemented for the ec2 runner")
+func (r *Runner) Start() error {
+	zlog.Info().Msg("Start is not implemented for the ec2 runner")
+
+	return nil
+}
+
+func (r *Runner) Stop() error {
+	r.cancel()
+
+	return nil
 }
 
 func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {

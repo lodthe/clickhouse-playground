@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"clickhouse-playground/internal/metrics"
-	"clickhouse-playground/internal/qrunner"
 
 	"github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
@@ -48,13 +47,13 @@ func (g *garbageCollector) start() {
 		return
 	}
 
-	zlog.Info().Dur("trigger_frequency", g.cfg.TriggerFrequency).Msg("dockerengine gc has been started")
-	defer zlog.Info().Msg("dockerengine gc has been finished")
+	zlog.Info().Dur("trigger_frequency", g.cfg.TriggerFrequency).Msg("gc has been started")
+	defer zlog.Info().Msg("gc has been finished")
 
 	trigger := func() {
 		err := g.trigger()
 		if err != nil {
-			zlog.Err(err).Msg("dockerengine gc trigger failed")
+			zlog.Err(err).Msg("gc trigger failed")
 		}
 	}
 
@@ -154,37 +153,17 @@ func (g *garbageCollector) collectImages() (count uint, spaceReclaimed uint64, e
 		g.metr.ContainersCollected(count, spaceReclaimed, startedAt)
 	}()
 
-	images, err := g.engine.getImages(g.ctx)
+	images, err := g.engine.getImages(g.ctx, g.repository, true)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to list images")
 	}
 
-	// Find all images with chp tags.
-	var candidates []types.ImageSummary
-	var spaceConsumed uint64
-	for _, img := range images {
-		var matched bool
-		for _, tag := range img.RepoTags {
-			if qrunner.IsPlaygroundImageName(tag, g.repository) {
-				matched = true
-				break
-			}
-		}
-
-		if !matched {
-			continue
-		}
-
-		candidates = append(candidates, img)
-		spaceConsumed += uint64(img.Size)
-	}
-
-	if len(candidates) < int(*g.cfg.ImageGCCountThreshold) {
+	if len(images) < int(*g.cfg.ImageGCCountThreshold) {
 		return 0, 0, nil
 	}
 
-	detailed := make([]types.ImageInspect, 0, len(candidates))
-	for _, c := range candidates {
+	detailed := make([]types.ImageInspect, 0, len(images))
+	for _, c := range images {
 		inspect, err := g.engine.getImageByID(g.ctx, c.ID)
 		if err != nil {
 			zlog.Err(err).Str("image_id", c.ID).Msg("docker image inspect failed")

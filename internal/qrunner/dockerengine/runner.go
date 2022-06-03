@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"sync"
 	"time"
 
 	"clickhouse-playground/internal/dockertag"
@@ -29,27 +30,35 @@ type ImageTagStorage interface {
 // This runner can start instances on arbitrary type of server, even on the same server where the coordinator
 // is started. The main requirement is the running Docker daemon and granted access to it.
 type Runner struct {
-	ctx  context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	name string
 	cfg  Config
 
 	engine       *engineProvider
 	tagStorage   ImageTagStorage
-	gc           *garbageCollector
 	pipelineMetr *metrics.PipelineExporter
+
+	workers sync.WaitGroup
+	gc      *garbageCollector
+	status  *statusCollector
 }
 
 func New(ctx context.Context, name string, cfg Config, cli *dockercli.Client, tagStorage ImageTagStorage) *Runner {
+	ctx, cancel := context.WithCancel(ctx)
 	engine := newProvider(ctx, cli)
 
 	return &Runner{
 		ctx:          ctx,
+		cancel:       cancel,
 		name:         name,
 		cfg:          cfg,
 		engine:       engine,
 		tagStorage:   tagStorage,
-		gc:           newGarbageCollector(ctx, cfg.GC, cfg.Repository, engine, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name)),
 		pipelineMetr: metrics.NewPipelineExporter(string(qrunner.TypeDockerEngine), name),
+		gc:           newGarbageCollector(ctx, cfg.GC, cfg.Repository, engine, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name)),
+		status:       newStatusCollector(ctx, cfg.Repository, cfg.StatusCollectionFrequency, engine, metrics.NewRunnerStatusExporter(string(qrunner.TypeDockerEngine), name)),
 	}
 }
 
@@ -61,11 +70,30 @@ func (r *Runner) Name() string {
 	return r.name
 }
 
-// StartGarbageCollector triggers periodically the garbage collector
-// to prune infrequently used images and hanged up containers.
-// Trigger frequency, image and container TTL, and other gc are configured in Config.
-func (r *Runner) StartGarbageCollector() {
-	r.gc.start()
+// Start runs the following background tasks:
+// 1) gc -- prunes containers and images;
+// 2) status exporter -- exports information about current state of the runner.
+func (r *Runner) Start() error {
+	r.workers.Add(1)
+	go func() {
+		defer r.workers.Done()
+		r.gc.start()
+	}()
+
+	r.workers.Add(1)
+	go func() {
+		defer r.workers.Done()
+		r.status.start()
+	}()
+
+	return nil
+}
+
+func (r *Runner) Stop() error {
+	r.cancel()
+	r.workers.Wait()
+
+	return nil
 }
 
 func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
