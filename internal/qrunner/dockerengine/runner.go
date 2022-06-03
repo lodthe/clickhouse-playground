@@ -12,7 +12,6 @@ import (
 	"clickhouse-playground/internal/metrics"
 	"clickhouse-playground/internal/qrunner"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	dockercli "github.com/docker/docker/client"
@@ -34,20 +33,22 @@ type Runner struct {
 	name string
 	cfg  Config
 
-	cli          *dockercli.Client
+	engine       *engineProvider
 	tagStorage   ImageTagStorage
 	gc           *garbageCollector
 	pipelineMetr *metrics.PipelineExporter
 }
 
 func New(ctx context.Context, name string, cfg Config, cli *dockercli.Client, tagStorage ImageTagStorage) *Runner {
+	engine := newProvider(ctx, cli)
+
 	return &Runner{
 		ctx:          ctx,
 		name:         name,
 		cfg:          cfg,
-		cli:          cli,
+		engine:       engine,
 		tagStorage:   tagStorage,
-		gc:           newGarbageCollector(ctx, cfg.GC, cfg.Repository, cli, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name)),
+		gc:           newGarbageCollector(ctx, cfg.GC, cfg.Repository, engine, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name)),
 		pipelineMetr: metrics.NewPipelineExporter(string(qrunner.TypeDockerEngine), name),
 	}
 }
@@ -98,10 +99,12 @@ func (r *Runner) RunQuery(ctx context.Context, runID string, query string, versi
 			r.pipelineMetr.RemoveContainer(err == nil, "", startedAt)
 		}()
 
-		err = r.gc.forceRemoveContainer(state.containerID)
+		err = r.engine.removeContainer(r.ctx, state.containerID, true)
 		if err != nil {
 			zlog.Error().Err(err).Str("run_id", state.runID).Msg("failed to kill container")
 		}
+
+		zlog.Debug().Str("container_id", state.containerID).Msg("container has been force removed")
 	}()
 
 	output, err := r.runQuery(ctx, state)
@@ -128,7 +131,7 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 		return nil
 	}
 
-	out, err := r.cli.ImagePull(ctx, imageName, types.ImagePullOptions{})
+	out, err := r.engine.pullImage(ctx, imageName)
 	if err != nil {
 		r.pipelineMetr.PullNewImage(false, state.version, startedAt)
 		return errors.Wrap(err, "docker pull failed")
@@ -142,7 +145,7 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 
 	zlog.Debug().Str("image", imageName).Str("output", string(output)).Msg("base image has been pulled")
 
-	err = r.cli.ImageTag(ctx, imageName, state.chpImageName)
+	err = r.engine.addImageTag(ctx, imageName, state.chpImageName)
 	if err != nil {
 		r.pipelineMetr.PullNewImage(false, state.version, startedAt)
 		zlog.Error().Err(err).
@@ -167,7 +170,7 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 func (r *Runner) checkIfImageExists(ctx context.Context, state *requestState) bool {
 	startedAt := time.Now()
 
-	_, _, err := r.cli.ImageInspectWithRaw(ctx, state.chpImageName)
+	_, err := r.engine.getImageByID(ctx, state.chpImageName)
 	if err == nil {
 		r.pipelineMetr.PullExistedImage(true, state.version, startedAt)
 		zlog.Debug().
@@ -209,7 +212,7 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 		})
 	}
 
-	cont, err := r.cli.ContainerCreate(ctx, contConfig, hostConfig, nil, nil, "")
+	cont, err := r.engine.createContainer(ctx, contConfig, hostConfig)
 	if err != nil {
 		return errors.Wrap(err, "container cannot be created")
 	}
@@ -221,7 +224,7 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 		Str("container_id", cont.ID)
 	debugLogger.Dur("elapsed_ms", time.Since(invokedAt)).Msg("container has been created")
 
-	err = r.cli.ContainerStart(ctx, cont.ID, types.ContainerStartOptions{})
+	err = r.engine.startContainer(ctx, cont.ID)
 	if err != nil {
 		return errors.Wrap(err, "container cannot be started")
 	}
@@ -239,18 +242,9 @@ func (r *Runner) exec(ctx context.Context, state *requestState) (stdout string, 
 		r.pipelineMetr.ExecCommand(err == nil, state.version, invokedAt)
 	}()
 
-	exec, err := r.cli.ContainerExecCreate(ctx, state.containerID, types.ExecConfig{
-		AttachStderr: true,
-		AttachStdout: true,
-		Cmd:          []string{"clickhouse-client", "-n", "-m", "--query", state.query},
-	})
+	resp, err := r.engine.exec(ctx, state.containerID, []string{"clickhouse-client", "-n", "-m", "--query", state.query})
 	if err != nil {
-		return "", "", errors.Wrap(err, "exec create failed")
-	}
-
-	resp, err := r.cli.ContainerExecAttach(ctx, exec.ID, types.ExecStartCheck{})
-	if err != nil {
-		return "", "", errors.Wrap(err, "exec attach failed")
+		return "", "", errors.Wrap(err, "exec failed")
 	}
 	defer resp.Close()
 
