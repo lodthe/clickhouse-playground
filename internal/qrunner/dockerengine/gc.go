@@ -9,8 +9,6 @@ import (
 	"clickhouse-playground/internal/qrunner"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-	dockercli "github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	zlog "github.com/rs/zerolog/log"
 )
@@ -20,16 +18,16 @@ type garbageCollector struct {
 	cfg        *GCConfig
 	repository string
 
-	cli  *dockercli.Client
-	metr *metrics.RunnerGCExporter
+	engine *engineProvider
+	metr   *metrics.RunnerGCExporter
 }
 
-func newGarbageCollector(ctx context.Context, cfg *GCConfig, repository string, cli *dockercli.Client, metr *metrics.RunnerGCExporter) *garbageCollector {
+func newGarbageCollector(ctx context.Context, cfg *GCConfig, repository string, engine *engineProvider, metr *metrics.RunnerGCExporter) *garbageCollector {
 	return &garbageCollector{
 		ctx:        ctx,
 		cfg:        cfg,
 		repository: repository,
-		cli:        cli,
+		engine:     engine,
 		metr:       metr,
 	}
 }
@@ -108,7 +106,7 @@ func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint6
 		g.metr.ContainersCollected(count, spaceReclaimed, startedAt)
 	}()
 
-	out, err := g.cli.ContainersPrune(g.ctx, filters.NewArgs(filters.Arg("label", qrunner.LabelOwnership)))
+	out, err := g.engine.pruneContainers(g.ctx)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to prune stopped containers")
 	}
@@ -121,12 +119,7 @@ func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint6
 	}
 
 	// Find hanged up containers and force remove them.
-	containers, err := g.cli.ContainerList(g.ctx, types.ContainerListOptions{
-		Size:    true,
-		All:     true,
-		Limit:   -1,
-		Filters: filters.NewArgs(filters.Arg("label", qrunner.LabelOwnership)),
-	})
+	containers, err := g.engine.getContainers(g.ctx)
 	if err != nil {
 		return count, spaceReclaimed, errors.Wrap(err, "failed to list containers")
 	}
@@ -137,11 +130,13 @@ func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint6
 			continue
 		}
 
-		err = g.forceRemoveContainer(c.ID)
+		err = g.engine.removeContainer(g.ctx, c.ID, true)
 		if err != nil {
 			zlog.Error().Err(err).Str("container_id", c.ID).Msg("containers gc failed to remove container")
 			continue
 		}
+
+		zlog.Debug().Str("container_id", c.ID).Msg("container has been force removed")
 
 		count++
 		spaceReclaimed += uint64(c.SizeRw)
@@ -154,22 +149,19 @@ func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint6
 // If there are at least GCConfig.ImageGCCountThreshold downloaded chp images, it leaves GCConfig.ImageBufferSize
 // least recently tagged images and removes the others.
 func (g *garbageCollector) collectImages() (count uint, spaceReclaimed uint64, err error) {
-	if g.cfg.ImageGCCountThreshold == nil {
-		return 0, 0, nil
-	}
-
 	startedAt := time.Now()
 	defer func() {
 		g.metr.ContainersCollected(count, spaceReclaimed, startedAt)
 	}()
 
-	images, err := g.cli.ImageList(g.ctx, types.ImageListOptions{})
+	images, err := g.engine.getImages(g.ctx)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to list images")
 	}
 
 	// Find all images with chp tags.
 	var candidates []types.ImageSummary
+	var spaceConsumed uint64
 	for _, img := range images {
 		var matched bool
 		for _, tag := range img.RepoTags {
@@ -184,6 +176,7 @@ func (g *garbageCollector) collectImages() (count uint, spaceReclaimed uint64, e
 		}
 
 		candidates = append(candidates, img)
+		spaceConsumed += uint64(img.Size)
 	}
 
 	if len(candidates) < int(*g.cfg.ImageGCCountThreshold) {
@@ -192,7 +185,7 @@ func (g *garbageCollector) collectImages() (count uint, spaceReclaimed uint64, e
 
 	detailed := make([]types.ImageInspect, 0, len(candidates))
 	for _, c := range candidates {
-		inspect, _, err := g.cli.ImageInspectWithRaw(g.ctx, c.ID)
+		inspect, err := g.engine.getImageByID(g.ctx, c.ID)
 		if err != nil {
 			zlog.Err(err).Str("image_id", c.ID).Msg("docker image inspect failed")
 			continue
@@ -218,9 +211,7 @@ func (g *garbageCollector) removeImages(images []types.ImageInspect) (count uint
 	for _, img := range images {
 		ok := true
 		for _, tag := range img.RepoTags {
-			_, err := g.cli.ImageRemove(g.ctx, tag, types.ImageRemoveOptions{
-				PruneChildren: true,
-			})
+			_, err := g.engine.removeImage(g.ctx, tag, true)
 			if err != nil {
 				zlog.Err(err).Str("image_id", img.ID).Msg("failed to delete image tag")
 				ok = false
@@ -240,18 +231,4 @@ func (g *garbageCollector) removeImages(images []types.ImageInspect) (count uint
 	}
 
 	return count, spaceReclaimed
-}
-
-func (g *garbageCollector) forceRemoveContainer(id string) (err error) {
-	err = g.cli.ContainerRemove(g.ctx, id, types.ContainerRemoveOptions{
-		RemoveVolumes: true,
-		Force:         true,
-	})
-	if err != nil {
-		return err
-	}
-
-	zlog.Debug().Str("container_id", id).Msg("container has been force removed")
-
-	return nil
 }
