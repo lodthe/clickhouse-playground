@@ -7,11 +7,13 @@ import (
 	"clickhouse-playground/internal/metrics"
 
 	"github.com/pkg/errors"
-	zlog "github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 type statusCollector struct {
 	ctx context.Context
+
+	logger zerolog.Logger
 
 	engine *engineProvider
 	metr   *metrics.RunnerStatusExporter
@@ -20,9 +22,10 @@ type statusCollector struct {
 	frequency  time.Duration
 }
 
-func newStatusCollector(ctx context.Context, repo string, collectFrequency time.Duration, engine *engineProvider, metr *metrics.RunnerStatusExporter) *statusCollector {
+func newStatusCollector(ctx context.Context, logger zerolog.Logger, repo string, collectFrequency time.Duration, engine *engineProvider, metr *metrics.RunnerStatusExporter) *statusCollector {
 	return &statusCollector{
 		ctx:        ctx,
+		logger:     logger,
 		engine:     engine,
 		metr:       metr,
 		repository: repo,
@@ -31,13 +34,13 @@ func newStatusCollector(ctx context.Context, repo string, collectFrequency time.
 }
 
 func (s *statusCollector) start() {
-	zlog.Info().Dur("trigger_frequency", s.frequency).Msg("status collector has been started")
-	defer zlog.Info().Msg("status collector has been finished")
+	s.logger.Info().Dur("trigger_frequency", s.frequency).Msg("status collector has been started")
+	defer s.logger.Info().Msg("status collector has been finished")
 
 	collect := func() {
 		err := s.collect()
 		if err != nil {
-			zlog.Err(err).Msg("failed to collect runner status")
+			s.logger.Err(err).Msg("failed to collect runner status")
 		}
 	}
 
@@ -71,8 +74,6 @@ func (s *statusCollector) collect() error {
 	}
 
 	s.metr.UpdateContainerStatus(contCount, contSpace)
-
-	zlog.Trace().Msg("status has been collected")
 
 	return nil
 }

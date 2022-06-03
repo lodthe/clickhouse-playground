@@ -9,11 +9,14 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
-	zlog "github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 type garbageCollector struct {
-	ctx        context.Context
+	ctx context.Context
+
+	logger zerolog.Logger
+
 	cfg        *GCConfig
 	repository string
 
@@ -21,9 +24,10 @@ type garbageCollector struct {
 	metr   *metrics.RunnerGCExporter
 }
 
-func newGarbageCollector(ctx context.Context, cfg *GCConfig, repository string, engine *engineProvider, metr *metrics.RunnerGCExporter) *garbageCollector {
+func newGarbageCollector(ctx context.Context, logger zerolog.Logger, cfg *GCConfig, repository string, engine *engineProvider, metr *metrics.RunnerGCExporter) *garbageCollector {
 	return &garbageCollector{
 		ctx:        ctx,
+		logger:     logger,
 		cfg:        cfg,
 		repository: repository,
 		engine:     engine,
@@ -43,17 +47,17 @@ func (g *garbageCollector) isStopped() bool {
 
 func (g *garbageCollector) start() {
 	if g.cfg == nil {
-		zlog.Info().Msg("garbage collector is disabled due to a missed configuration")
+		g.logger.Info().Msg("garbage collector is disabled due to a missed configuration")
 		return
 	}
 
-	zlog.Info().Dur("trigger_frequency", g.cfg.TriggerFrequency).Msg("gc has been started")
-	defer zlog.Info().Msg("gc has been finished")
+	g.logger.Info().Dur("trigger_frequency", g.cfg.TriggerFrequency).Msg("gc has been started")
+	defer g.logger.Info().Msg("gc has been finished")
 
 	trigger := func() {
 		err := g.trigger()
 		if err != nil {
-			zlog.Err(err).Msg("gc trigger failed")
+			g.logger.Err(err).Msg("gc trigger failed")
 		}
 	}
 
@@ -92,7 +96,7 @@ func (g *garbageCollector) trigger() (err error) {
 		return errors.Wrap(err, "images gc failed")
 	}
 
-	zlog.Debug().Msg("gc finished")
+	g.logger.Debug().Msg("gc finished")
 
 	return nil
 }
@@ -131,11 +135,11 @@ func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint6
 
 		err = g.engine.removeContainer(g.ctx, c.ID, true)
 		if err != nil {
-			zlog.Error().Err(err).Str("container_id", c.ID).Msg("containers gc failed to remove container")
+			g.logger.Error().Err(err).Str("container_id", c.ID).Msg("containers gc failed to remove container")
 			continue
 		}
 
-		zlog.Debug().Str("container_id", c.ID).Msg("container has been force removed")
+		g.logger.Debug().Str("container_id", c.ID).Msg("container has been force removed")
 
 		count++
 		spaceReclaimed += uint64(c.SizeRw)
@@ -166,7 +170,7 @@ func (g *garbageCollector) collectImages() (count uint, spaceReclaimed uint64, e
 	for _, c := range images {
 		inspect, err := g.engine.getImageByID(g.ctx, c.ID)
 		if err != nil {
-			zlog.Err(err).Str("image_id", c.ID).Msg("docker image inspect failed")
+			g.logger.Err(err).Str("image_id", c.ID).Msg("docker image inspect failed")
 			continue
 		}
 
@@ -192,7 +196,7 @@ func (g *garbageCollector) removeImages(images []types.ImageInspect) (count uint
 		for _, tag := range img.RepoTags {
 			_, err := g.engine.removeImage(g.ctx, tag, true)
 			if err != nil {
-				zlog.Err(err).Str("image_id", img.ID).Msg("failed to delete image tag")
+				g.logger.Err(err).Str("image_id", img.ID).Msg("failed to delete image tag")
 				ok = false
 
 				continue
@@ -203,7 +207,7 @@ func (g *garbageCollector) removeImages(images []types.ImageInspect) (count uint
 			continue
 		}
 
-		zlog.Debug().Str("id", img.ID).Strs("tags", img.RepoTags).Msg("image has been removed")
+		g.logger.Debug().Str("id", img.ID).Strs("tags", img.RepoTags).Msg("image has been removed")
 
 		count++
 		spaceReclaimed += uint64(img.Size)

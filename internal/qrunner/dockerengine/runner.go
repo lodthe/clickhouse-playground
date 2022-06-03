@@ -18,7 +18,7 @@ import (
 	dockercli "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/pkg/errors"
-	zlog "github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 type ImageTagStorage interface {
@@ -33,6 +33,8 @@ type Runner struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	logger zerolog.Logger
+
 	name string
 	cfg  Config
 
@@ -45,20 +47,23 @@ type Runner struct {
 	status  *statusCollector
 }
 
-func New(ctx context.Context, name string, cfg Config, cli *dockercli.Client, tagStorage ImageTagStorage) *Runner {
+func New(ctx context.Context, logger zerolog.Logger, name string, cfg Config, cli *dockercli.Client, tagStorage ImageTagStorage) *Runner {
 	ctx, cancel := context.WithCancel(ctx)
 	engine := newProvider(ctx, cli)
+
+	logger = logger.With().Str("runner", name).Logger()
 
 	return &Runner{
 		ctx:          ctx,
 		cancel:       cancel,
+		logger:       logger,
 		name:         name,
 		cfg:          cfg,
 		engine:       engine,
 		tagStorage:   tagStorage,
 		pipelineMetr: metrics.NewPipelineExporter(string(qrunner.TypeDockerEngine), name),
-		gc:           newGarbageCollector(ctx, cfg.GC, cfg.Repository, engine, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name)),
-		status:       newStatusCollector(ctx, cfg.Repository, cfg.StatusCollectionFrequency, engine, metrics.NewRunnerStatusExporter(string(qrunner.TypeDockerEngine), name)),
+		gc:           newGarbageCollector(ctx, logger, cfg.GC, cfg.Repository, engine, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name)),
+		status:       newStatusCollector(ctx, logger, cfg.Repository, cfg.StatusCollectionFrequency, engine, metrics.NewRunnerStatusExporter(string(qrunner.TypeDockerEngine), name)),
 	}
 }
 
@@ -129,10 +134,10 @@ func (r *Runner) RunQuery(ctx context.Context, runID string, query string, versi
 
 		err = r.engine.removeContainer(r.ctx, state.containerID, true)
 		if err != nil {
-			zlog.Error().Err(err).Str("run_id", state.runID).Msg("failed to kill container")
+			r.logger.Error().Err(err).Str("run_id", state.runID).Msg("failed to kill container")
 		}
 
-		zlog.Debug().Str("container_id", state.containerID).Msg("container has been force removed")
+		r.logger.Debug().Str("container_id", state.containerID).Msg("container has been force removed")
 	}()
 
 	output, err := r.runQuery(ctx, state)
@@ -168,15 +173,15 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 	// We should read the output to be sure that the image has been pulled.
 	output, err := io.ReadAll(out)
 	if err != nil {
-		zlog.Error().Err(err).Str("image", imageName).Msg("failed to read pull output")
+		r.logger.Error().Err(err).Str("image", imageName).Msg("failed to read pull output")
 	}
 
-	zlog.Debug().Str("image", imageName).Str("output", string(output)).Msg("base image has been pulled")
+	r.logger.Debug().Str("image", imageName).Str("output", string(output)).Msg("base image has been pulled")
 
 	err = r.engine.addImageTag(ctx, imageName, state.chpImageName)
 	if err != nil {
 		r.pipelineMetr.PullNewImage(false, state.version, startedAt)
-		zlog.Error().Err(err).
+		r.logger.Error().Err(err).
 			Str("run_id", state.runID).
 			Str("source", imageName).
 			Str("target", state.chpImageName).
@@ -186,7 +191,7 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 	}
 
 	r.pipelineMetr.PullNewImage(true, state.version, startedAt)
-	zlog.Debug().
+	r.logger.Debug().
 		Str("run_id", state.runID).
 		Dur("elapsed_ms", time.Since(startedAt)).
 		Str("image", imageName).
@@ -201,7 +206,7 @@ func (r *Runner) checkIfImageExists(ctx context.Context, state *requestState) bo
 	_, err := r.engine.getImageByID(ctx, state.chpImageName)
 	if err == nil {
 		r.pipelineMetr.PullExistedImage(true, state.version, startedAt)
-		zlog.Debug().
+		r.logger.Debug().
 			Dur("elapsed_ms", time.Since(startedAt)).
 			Str("image", state.chpImageName).
 			Msg("image has already been pulled")
@@ -210,7 +215,7 @@ func (r *Runner) checkIfImageExists(ctx context.Context, state *requestState) bo
 	}
 	if err != nil && !dockercli.IsErrNotFound(err) {
 		r.pipelineMetr.PullExistedImage(false, state.version, startedAt)
-		zlog.Error().Err(err).Str("image", state.chpImageName).Msg("docker inspect failed")
+		r.logger.Error().Err(err).Str("image", state.chpImageName).Msg("docker inspect failed")
 	}
 
 	return false
@@ -246,7 +251,7 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 	}
 
 	createdAt := time.Now()
-	debugLogger := zlog.Debug().
+	debugLogger := r.logger.Debug().
 		Str("run_id", state.runID).
 		Str("image", state.chpImageName).
 		Str("container_id", cont.ID)
@@ -295,7 +300,7 @@ func (r *Runner) exec(ctx context.Context, state *requestState) (stdout string, 
 		return "", "", ctx.Err()
 	}
 
-	zlog.Debug().Str("run_id", state.runID).Dur("elapsed_ms", time.Since(invokedAt)).Msg("exec finished")
+	r.logger.Debug().Str("run_id", state.runID).Dur("elapsed_ms", time.Since(invokedAt)).Msg("exec finished")
 
 	return outBuf.String(), errBuf.String(), nil
 }
@@ -316,7 +321,7 @@ func (r *Runner) runQuery(ctx context.Context, state *requestState) (output stri
 		}
 
 		if qrunner.CheckIfClickHouseIsReady(stderr) {
-			zlog.Debug().Str("run_id", state.runID).Msg("query has been executed")
+			r.logger.Debug().Str("run_id", state.runID).Msg("query has been executed")
 			break
 		}
 

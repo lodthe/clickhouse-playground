@@ -179,7 +179,7 @@ func newDockerEngineRunner(ctx context.Context, config *Config, tagStorage *dock
 		}
 	}
 
-	return dockerengine.New(ctx, config.Runner.Name, localCfg, dockerCli, tagStorage), nil
+	return dockerengine.New(ctx, zlog.Logger, config.Runner.Name, localCfg, dockerCli, tagStorage), nil
 }
 
 func getDockerEngineOpts(config *DockerEngine) ([]dockercli.Opt, error) {
