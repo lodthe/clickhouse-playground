@@ -5,7 +5,7 @@ FROM golang:1.17.3-alpine3.14 AS builder
 
 # Setup base software for building an app.
 RUN apk update && \
-    apk add bash ca-certificates git gcc g++ libc-dev binutils file
+    apk add ca-certificates git gcc g++ libc-dev binutils
 
 WORKDIR /opt
 
@@ -23,15 +23,12 @@ RUN go build -o bin/application cmd/server/*
 FROM alpine:3.14 AS runner
 
 RUN apk update && \
-    apk add ca-certificates libc6-compat && \
+    apk add ca-certificates libc6-compat bash openssh && \
     rm -rf /var/cache/apk/*
 
 WORKDIR /opt
 
 COPY --from=builder /opt/bin/application ./
-
-# Add required static files.
-#COPY assets assets
 
 COPY fast-startup-config.xml .
 

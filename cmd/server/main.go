@@ -69,6 +69,7 @@ func main() {
 	}, dockerhubCli)
 	tagStorage.RunBackgroundUpdate()
 
+	// Create runners.
 	var runner qrunner.Runner
 	switch config.Runner.Type {
 	case RunnerTypeEC2:
@@ -84,6 +85,7 @@ func main() {
 		zlog.Fatal().Msg("invalid runner")
 	}
 
+	// Start the runner gc.
 	go func() {
 		runner.StartGarbageCollector()
 	}()
@@ -92,6 +94,7 @@ func main() {
 
 	router := api.NewRouter(runner, tagStorage, runRepo, config.DockerImage.Name, config.API.ServerTimeout)
 
+	// Start REST API server.
 	srv := &http.Server{
 		Addr:    config.API.ListeningAddress,
 		Handler: router,
@@ -105,6 +108,7 @@ func main() {
 		}
 	}()
 
+	// Export Prometheus metrics.
 	go func() {
 		zlog.Info().Str("address", config.PrometheusExportAddress).Msg("starting the prometheus exporter")
 
@@ -142,6 +146,16 @@ func newDockerEngineRunner(ctx context.Context, config *Config, tagStorage *dock
 		return nil, errors.Wrap(err, "failed to create Docker client")
 	}
 
+	ping, err := dockerCli.Ping(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to ping the docker daemon of %s runner", config.Runner.Name)
+	}
+
+	zlog.Info().
+		Str("runner_name", config.Runner.Name).
+		Str("api_version", ping.APIVersion).
+		Msg("established a connection with a docker daemon")
+
 	localCfg := dockerengine.DefaultConfig
 	localCfg.CustomConfigPath = config.CustomConfigPath
 	localCfg.Repository = config.DockerImage.Name
@@ -169,7 +183,8 @@ func getDockerEngineOpts(config *DockerEngine) ([]dockercli.Opt, error) {
 		return opts, nil
 	}
 
-	helper, err := connhelper.GetConnectionHelper(*config.DaemonURL)
+	// Set 'StrictHostKeyChecking=no' to simplify startup in Docker containers.
+	helper, err := connhelper.GetConnectionHelperWithSSHOpts(*config.DaemonURL, []string{"-o", "StrictHostKeyChecking=no"})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create ssh connection")
 	}
