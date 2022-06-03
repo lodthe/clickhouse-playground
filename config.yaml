@@ -58,9 +58,8 @@ runner:
     # especially if you are running the playground in a Docker container:
     #
     # 1) There is must be the ssh executable in the running system, and it must be available
-    #    for playground to run it. Usually, you can install the openssh package to get the ssh executable.
-    # 2) You can specify a shorthand SSH host in a SSH config (~/.ssh/config or /etc/ssh/ssh_config)
-    #    and use it.
+    #    for playground to run it. Usually, you can install the openssh-client package to get the ssh executable.
+    # 2) You can specify a shorthand SSH host in the SSH config (~/.ssh/config or /etc/ssh/ssh_config) and use it.
     #
     #    For example, if you have the following configuration
     #    ---
