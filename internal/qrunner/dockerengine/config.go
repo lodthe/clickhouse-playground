@@ -12,6 +12,8 @@ type Config struct {
 	CustomConfigPath *string
 
 	GC *GCConfig
+
+	StatusCollectionFrequency time.Duration
 }
 
 type GCConfig struct {
@@ -48,4 +50,6 @@ var DefaultConfig = Config{
 		ImageGCCountThreshold: &defaultImageGCCountThreshold,
 		ImageBufferSize:       defaultImageBufferSize,
 	},
+
+	StatusCollectionFrequency: 30 * time.Second,
 }

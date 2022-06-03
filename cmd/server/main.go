@@ -87,7 +87,10 @@ func main() {
 
 	// Start the runner gc.
 	go func() {
-		runner.StartGarbageCollector()
+		err := runner.Start()
+		if err != nil {
+			zlog.Fatal().Err(err).Msg("runner cannot be started")
+		}
 	}()
 
 	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWS.QueryRunsTableName)
@@ -124,6 +127,11 @@ func main() {
 
 	shutdownCtx, shutdown := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer shutdown()
+
+	err = runner.Stop()
+	if err != nil {
+		zlog.Err(err).Msg("runner cannot be stopped")
+	}
 
 	err = srv.Shutdown(shutdownCtx)
 	if err != nil {

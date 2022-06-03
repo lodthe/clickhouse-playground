@@ -44,10 +44,35 @@ func (p *engineProvider) getImageByID(ctx context.Context, name string) (types.I
 	return inspect, err
 }
 
-func (p *engineProvider) getImages(ctx context.Context) ([]types.ImageSummary, error) {
-	return p.cli.ImageList(ctx, types.ImageListOptions{
+// getImages returns existing images.
+// If filterChp is true, only created by the playground images are returned.s
+func (p *engineProvider) getImages(ctx context.Context, repository string, filterChp bool) ([]types.ImageSummary, error) {
+	images, err := p.cli.ImageList(ctx, types.ImageListOptions{
 		All: true,
 	})
+
+	if err != nil || !filterChp {
+		return images, err
+	}
+
+	for i := 0; i < len(images); i++ {
+		var matched bool
+		for _, tag := range images[i].RepoTags {
+			if qrunner.IsPlaygroundImageName(tag, repository) {
+				matched = true
+				break
+			}
+		}
+
+		// If it's not chp-image, swap if with the last element and pop it in O(1).
+		if !matched {
+			images[i] = images[len(images)-1]
+			images = images[:len(images)-1]
+			i--
+		}
+	}
+
+	return images, nil
 }
 
 func (p *engineProvider) removeImage(ctx context.Context, tag string, pruneChildren bool) ([]types.ImageDeleteResponseItem, error) {
