@@ -1,0 +1,137 @@
+# The default config location is 'config.yaml', but it can be overridden via CONFIG_PATH env.
+
+# [OPTIONAL] Log redundancy level. Default: debug.
+# Available log levels: trace (all), debug, info, warn, error, fatal, disabled.
+log_level: info
+
+# ClickHouse Docker image configuration.
+docker_image:
+  image: clickhouse/clickhouse-server
+  os: linux
+  architecture: amd64
+
+  # [OPTIONAL] How often available image tags will be fetched from dockerhub.
+  image_tags_cache_expiration_time: 3m
+
+# Rest API configuration.
+api:
+  # [OPTIONAL] Server listening address. Default: :9000.
+  address: :9000
+
+  # [OPTIONAL] Request processing timeout. Default: 60s.
+  server_timeout: 60s
+
+# You can set some limits to prevent budget waste on storage and etc.
+limits:
+  # If the length of a user's query exceeds this limit, the request is aborted.
+  # Default: 2500.
+  max_query_length: 2500
+
+  # If the length of a user's query execution result exceeds this limit, the request is aborted and
+  # output is not saved to the storage.
+  # Default: 25000.
+  max_output_length: 25000
+
+# [OPTIONAL] Prometheus metrics export address. Default: :2112.
+prometheus_address: :2112
+
+aws:
+  # AWS credentials. Also, you can set them via AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY envs.
+  access_key_id: key_id
+  secret_access_key: secret
+
+  region: us-east-2
+
+  # DynamoDB table name used to store completed query runs.
+  query_runs_table: QueryRuns
+
+# [OPTIONAL] Absolute path to the custom config used on clickhouse-server startup.
+# custom_config_path: /fast-startup-config.xml
+
+runners:
+  # You can specify several runners. The coordinator will load balance incoming queries among them.
+  - # Available types: EC2, DOCKER_ENGINE.
+    type: DOCKER_ENGINE
+    name: default
+
+    # You can specify the integer weight of the runner for load balancing.
+    # If the weight of r1 is 10 times the weight of r2, r1 is selected 10 times more often.
+    # Default: 100.
+    weight: 100
+
+    # Required if type is EC2.
+    ec2:
+      # AWS EC2 instance id used to run queries.
+      instance_id: i-023c5bb002bb45ad4
+
+    # Required if type is DOCKER_ENGINE.
+    docker_engine:
+      # [OPTIONAL] You can provide an SSH Docker Daemon URL to start containers remotely.
+      # Specified URL must start with "ssh://" and should be a valid SSH connection URL. It's like
+      # when you connect to a server via SSH and type "ssh user@host:port".
+      # To get the same effect, you should set daemon_url to "ssh://user@host:port".
+      #
+      # The playground just executes the ssh binary with the specified URL. Keep in mind the following points,
+      # especially if you are running the playground in a Docker container:
+      #
+      # 1) There is must be the ssh executable in the running system, and it must be available
+      #    for playground to run it. Usually, you can install the openssh-client package to get the ssh executable.
+      # 2) You can specify a shorthand SSH host in the SSH config (~/.ssh/config or /etc/ssh/ssh_config) and use it.
+      #
+      #    For example, if you have the following configuration
+      #    ---
+      #    Host playground-1
+      #	   HostName playground-1.example.com
+      #	   User lodthe
+      #	   Port 22
+      #	   IdentityFile ~/.ssh/playground_1.pem
+      #   ---
+      #   you can set daemon_url to "playground-1", and it will work correctly!
+      #
+      #
+      # Default: local "unix:///var/run/docker.sock" is used.
+      # daemon_url: ssh://clickhouse-playground
+
+      # You can configure the garbage collector to prune hanged up containers and images.
+      # If the field is missed, gc is disabled.
+      # Default: gc is disabled.
+      gc:
+        # [OPTIONAL] How often the garbage collector should be triggered. Default: once a minute.
+        trigger_frequency: 1m
+
+        # Containers GC
+
+        # [OPTIONAL] Containers created before (NOW() - TTL) are force removed.
+        # Default: disabled (containers are not force removed).
+        container_ttl: 1m
+
+        # Images GC
+
+        # Image gc triggers when there are at least image_count_threshold downloaded images.
+        # Default: missed (images are not pruned).
+        image_count_threshold: 50
+
+        # # After the images garbage collection, at most image_buffer_size least recently tagged images will be left.
+        # Default: 0 (all images are pruned).
+        image_buffer_size: 30
+
+      # You can limit resources usage for a Docker container.
+      # Refer to the official Docker documentation for more detail:
+      # https://docs.docker.com/config/containers/resource_constraints/
+      container_resources:
+        # Specify how much of the available CPU resources a container can use.
+        # Docker cli: docker run --cpus=2.5
+        # Default: unlimited.
+        cpu_limit: 2.5
+
+        # Limit the specific CPUs or cores a container can use.
+        # A comma-separated list or hyphen-separated range of CPUs a container can use,
+        # if you have more than one CPU. The first CPU is numbered 0.
+        # Docker cli: docker run --cpuset-cpus=0,2,4-8
+        # Default: any cpu cores.
+        cpu_cores_set:
+
+        # The maximum amount of memory the container can use in megabytes.
+        # Docker cli: docker run --memory=1000m
+        # Default: unlimited.
+        memory_limit_mb: 1000

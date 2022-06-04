@@ -1,0 +1,23 @@
+# my global config
+global:
+  scrape_interval:     15s # By default, scrape targets every 15 seconds.
+  evaluation_interval: 15s # By default, scrape targets every 15 seconds.
+
+
+scrape_configs:
+  - job_name: 'prometheus'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'cadvisor'
+    scrape_interval: 5s
+    static_configs:
+      - targets:
+          - cadvisor:8080
+
+  # Export your own application metrics.
+  - job_name: 'playground-server'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['playground:2112']

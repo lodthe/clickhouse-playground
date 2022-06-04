@@ -1,0 +1,107 @@
+version: '3'
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+
+networks:
+  playground:
+    external: true
+
+services:
+  prometheus:
+    networks:
+      - playground
+    image: prom/prometheus
+    restart: always
+    volumes:
+      - ./prometheus:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - 9090:9090
+    links:
+      - cadvisor:cadvisor
+    depends_on:
+      - cadvisor
+
+  cadvisor:
+    networks:
+      - playground
+    image: gcr.io/cadvisor/cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - 8080:8080
+    restart: unless-stopped
+    deploy:
+      mode: global
+
+  grafana:
+    networks:
+      - playground
+    image: grafana/grafana
+    user: '472'
+    restart: always
+    environment:
+      GF_INSTALL_PLUGINS: 'grafana-clock-panel,grafana-simple-json-datasource'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+      - ./grafana.ini:/etc/grafana/grafana.ini
+    env_file:
+      - ./grafana/config.monitoring
+    ports:
+      - 3000:3000
+    depends_on:
+      - prometheus
+
+  nginx:
+    image: nginx
+    restart: unless-stopped
+    networks:
+      - playground
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+
+  certbot:
+    networks:
+      - playground
+    image: certbot/certbot
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    restart: unless-stopped
+
+  playground:
+    networks:
+      - playground
+    image: lodthe/clickhouse-playground
+    ports:
+      - 9000:9000
+    environment:
+      CONFIG_PATH: /config.yml
+    volumes:
+      - /home/lodthe/playground/config.yml:/config.yml
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
+
+  webapp:
+    networks:
+      - playground
+    image: lodthe/clickhouse-playground-ui
+    restart: always
