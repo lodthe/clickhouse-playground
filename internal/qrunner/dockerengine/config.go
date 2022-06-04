@@ -10,8 +10,12 @@ type Config struct {
 	ExecRetryDelay time.Duration
 	MaxExecRetries int
 
-	// Path to the xml or yaml config which will be added to the ../config.d/ directory.
+	// Path to the xml or yaml config which will be mounted to the ../config.d/ directory.
 	CustomConfigPath *string
+
+	// Path to the quotas config that will be mounted to the ../users.d/ directory.
+	// https://clickhouse.com/docs/en/operations/quotas/
+	QuotasPath *string
 
 	GC *GCConfig
 
@@ -53,6 +57,7 @@ var DefaultConfig = Config{
 	MaxExecRetries: 20,
 
 	CustomConfigPath: nil,
+	QuotasPath:       nil,
 
 	GC: &GCConfig{
 		TriggerFrequency:      5 * time.Minute,

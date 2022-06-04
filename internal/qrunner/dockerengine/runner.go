@@ -267,6 +267,16 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 		})
 	}
 
+	// A custom quotas config is used to avoid DOS.
+	if r.cfg.QuotasPath != nil {
+		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+			Type:     mount.TypeBind,
+			Source:   *r.cfg.QuotasPath,
+			Target:   fmt.Sprintf("/etc/clickhouse-server/users.d/default%s", path.Ext(*r.cfg.QuotasPath)),
+			ReadOnly: true,
+		})
+	}
+
 	cont, err := r.engine.createContainer(ctx, contConfig, hostConfig)
 	if err != nil {
 		return errors.Wrap(err, "container cannot be created")

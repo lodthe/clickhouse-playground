@@ -142,6 +142,7 @@ func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config
 			rcfg := dockerengine.DefaultConfig
 			rcfg.DaemonURL = r.DockerEngine.DaemonURL
 			rcfg.CustomConfigPath = r.DockerEngine.CustomConfigPath
+			rcfg.QuotasPath = r.DockerEngine.QuotasPath
 			rcfg.Repository = config.DockerImage.Name
 			rcfg.GC = nil
 

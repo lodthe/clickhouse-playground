@@ -85,6 +85,7 @@ type EC2 struct {
 type DockerEngine struct {
 	DaemonURL        *string         `mapstructure:"daemon_url"`
 	CustomConfigPath *string         `mapstructure:"custom_config_path"`
+	QuotasPath       *string         `mapstructure:"quotas_path"`
 	GC               *DockerEngineGC `mapstructure:"gc"`
 
 	ContainerResources ContainerResources `mapstructure:"container_resources"`

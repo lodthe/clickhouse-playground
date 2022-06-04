@@ -30,7 +30,7 @@ WORKDIR /opt
 
 COPY --from=builder /opt/bin/application ./
 
-COPY fast-startup-config.xml .
+COPY custom-configs/fast-startup-config.xml .
 
 EXPOSE 9000
 
