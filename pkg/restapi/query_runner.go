@@ -2,6 +2,7 @@ package restapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -17,16 +18,19 @@ type queryHandler struct {
 	r       qrunner.Runner
 	runRepo queryrun.Repository
 
-	tagStorage    TagStorage
-	chServerImage string
+	tagStorage TagStorage
+
+	maxQueryLength  uint64
+	maxOutputLength uint64
 }
 
-func newQueryHandler(r qrunner.Runner, runRepo queryrun.Repository, storage TagStorage, chServerImage string) *queryHandler {
+func newQueryHandler(r qrunner.Runner, runRepo queryrun.Repository, storage TagStorage, maxQueryLength, maxOutputLength uint64) *queryHandler {
 	return &queryHandler{
-		r:             r,
-		runRepo:       runRepo,
-		tagStorage:    storage,
-		chServerImage: chServerImage,
+		r:               r,
+		runRepo:         runRepo,
+		tagStorage:      storage,
+		maxQueryLength:  maxQueryLength,
+		maxOutputLength: maxOutputLength,
 	}
 }
 
@@ -54,6 +58,17 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Query == "" {
+		writeError(w, "query cannot be empty", http.StatusBadRequest)
+		return
+	}
+	if uint64(len(req.Query)) > h.maxQueryLength {
+		msg := fmt.Sprintf("query length (%d) cannot exceed %d", len(req.Query), h.maxQueryLength)
+		writeError(w, msg, http.StatusBadRequest)
+
+		return
+	}
+
 	if !h.tagStorage.Exists(req.Version) {
 		writeError(w, "unknown version", http.StatusBadRequest)
 		return
@@ -66,6 +81,12 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		zlog.Error().Err(err).Interface("request", req).Msg("query run failed")
 		writeError(w, "internal error", http.StatusInternalServerError)
+
+		return
+	}
+	if uint64(len(output)) > h.maxOutputLength {
+		msg := fmt.Sprintf("output length (%d) cannot exceed %d", len(output), h.maxOutputLength)
+		writeError(w, msg, http.StatusBadRequest)
 
 		return
 	}
