@@ -11,7 +11,7 @@ import (
 
 func TestCoordinator_selectRunner_EqualWeights(t *testing.T) {
 	const runnerCount = 5
-	const samples = 2500
+	const samples = 10000
 	const maxDeviation = 0.1
 	const expected = samples / runnerCount
 	// Each runner should be selected samples / runnerCount times roughly.
@@ -39,7 +39,7 @@ func TestCoordinator_selectRunner_EqualWeights(t *testing.T) {
 
 func TestCoordinator_selectRunner_DifferentWeights(t *testing.T) {
 	const runnerCount = 5
-	const samples = 2500
+	const samples = 10000
 	const maxDeviation = 0.1
 
 	var runners []*Runner
