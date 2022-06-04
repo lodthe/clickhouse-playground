@@ -1,4 +1,4 @@
-<clickhouse>
+<yandex>
   <mlock_executable replace="replace">false</mlock_executable>
 
   <graphite remove="remove" />
@@ -18,4 +18,4 @@
   <processors_profile_log remove="remove" />
   <zookeeper_log remove="remove" />
 
-</clickhouse>
+</yandex>
