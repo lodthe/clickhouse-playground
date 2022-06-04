@@ -3,6 +3,8 @@ package dockerengine
 import "time"
 
 type Config struct {
+	DaemonURL *string
+
 	Repository string
 
 	ExecRetryDelay time.Duration
