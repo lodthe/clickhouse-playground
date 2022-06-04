@@ -43,6 +43,11 @@ runners:
     type: DOCKER_ENGINE
     name: default
 
+    # You can specify the integer weight of the runner for load balancing.
+    # If the weight of r1 is 10 times the weight of r2, r1 is selected 10 times more often.
+    # Default: 100.
+    weight: 100
+
     # Required if type is EC2.
     ec2:
       # AWS EC2 instance id used to run queries.
