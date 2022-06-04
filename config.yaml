@@ -103,3 +103,24 @@ runners:
         # # After the images garbage collection, at most image_buffer_size least recently tagged images will be left.
         # Default: 0 (all images are pruned).
         image_buffer_size: 30
+
+      # You can limit resources usage for a Docker container.
+      # Refer to the official Docker documentation for more detail:
+      # https://docs.docker.com/config/containers/resource_constraints/
+      container_resources:
+        # Specify how much of the available CPU resources a container can use.
+        # Docker cli: docker run --cpus=2.5
+        # Default: unlimited.
+        cpu_limit: 2.5
+
+        # Limit the specific CPUs or cores a container can use.
+        # A comma-separated list or hyphen-separated range of CPUs a container can use,
+        # if you have more than one CPU. The first CPU is numbered 0.
+        # Docker cli: docker run --cpuset-cpus=0,2,4-8
+        # Default: any cpu cores.
+        cpu_cores_set:
+
+        # The maximum amount of memory the container can use in megabytes.
+        # Docker cli: docker run --memory=1000m
+        # Default: unlimited.
+        memory_limit_mb: 1000

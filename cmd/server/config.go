@@ -77,6 +77,8 @@ type DockerEngine struct {
 	DaemonURL        *string         `mapstructure:"daemon_url"`
 	CustomConfigPath *string         `mapstructure:"custom_config_path"`
 	GC               *DockerEngineGC `mapstructure:"gc"`
+
+	ContainerResources ContainerResources `mapstructure:"container_resources"`
 }
 
 type DockerEngineGC struct {
@@ -86,6 +88,12 @@ type DockerEngineGC struct {
 
 	ImageGCCountThreshold *uint `mapstructure:"image_count_threshold"`
 	ImageBufferSize       uint  `mapstructure:"image_buffer_size"`
+}
+
+type ContainerResources struct {
+	CPULimit      float64 `mapstructure:"cpu_limit"`
+	CPUSet        string  `mapstructure:"cpu_cores_set"`
+	MemoryLimitMB float64 `mapstructure:"memory_limit_mb"`
 }
 
 func (r *Runner) Validate() error {

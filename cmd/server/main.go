@@ -175,6 +175,12 @@ func newDockerEngineRunner(ctx context.Context, img DockerImage, config Runner, 
 	localCfg.Repository = img.Name
 	localCfg.GC = nil
 
+	localCfg.Container = dockerengine.ContainerResources{
+		CPULimit:    uint64(config.DockerEngine.ContainerResources.CPULimit * 1e9), // cpu -> nano cpu.
+		CPUSet:      config.DockerEngine.ContainerResources.CPUSet,
+		MemoryLimit: uint64(config.DockerEngine.ContainerResources.MemoryLimitMB * 1e6), // mb -> bytes.
+	}
+
 	gc := config.DockerEngine.GC
 	if gc != nil {
 		localCfg.GC = &dockerengine.GCConfig{
