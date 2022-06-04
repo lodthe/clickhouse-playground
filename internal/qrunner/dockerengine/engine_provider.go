@@ -3,9 +3,11 @@ package dockerengine
 import (
 	"context"
 	"io"
+	"net/http"
 
 	"clickhouse-playground/internal/qrunner"
 
+	"github.com/docker/cli/cli/connhelper"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -19,11 +21,59 @@ type engineProvider struct {
 	cli     *dockercli.Client
 }
 
-func newProvider(ctx context.Context, cli *dockercli.Client) *engineProvider {
+func newProvider(ctx context.Context, daemonURL *string) (*engineProvider, error) {
+	opts, err := getDockerEngineOpts(daemonURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build options for Docker client")
+	}
+
+	cli, err := dockercli.NewClientWithOpts(opts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create Docker client")
+	}
+
+	_, err = cli.Ping(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to ping the docker daemon")
+	}
+
 	return &engineProvider{
 		mainCtx: ctx,
 		cli:     cli,
+	}, nil
+}
+
+func getDockerEngineOpts(daemonURL *string) ([]dockercli.Opt, error) {
+	opts := []dockercli.Opt{
+		dockercli.WithAPIVersionNegotiation(),
 	}
+
+	if daemonURL == nil {
+		return opts, nil
+	}
+
+	// Set 'StrictHostKeyChecking=no' to simplify startup in Docker containers.
+	helper, err := connhelper.GetConnectionHelperWithSSHOpts(*daemonURL, []string{"-o", "StrictHostKeyChecking=no"})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create ssh connection")
+	}
+	if helper == nil {
+		return nil, errors.Wrap(err, "provided daemon_url cannot be recognized by Docker lib")
+	}
+
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: helper.Dialer,
+		},
+	}
+
+	opts = append(opts,
+		dockercli.WithHTTPClient(httpClient),
+		dockercli.WithHost(helper.Host),
+		dockercli.WithDialContext(helper.Dialer),
+	)
+
+	return opts, nil
 }
 
 func (p *engineProvider) ownershipLabelFilter() (key, value string) {

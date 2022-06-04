@@ -20,9 +20,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconf "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/docker/cli/cli/connhelper"
-	dockercli "github.com/docker/docker/client"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
@@ -31,25 +28,31 @@ import (
 const shutdownTimeout = 5 * time.Second
 
 func main() {
+	// Listen to termination signals.
+	ctx, cancel := context.WithCancel(context.Background())
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	// Basic logging preparation.
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
+	// Initialize config.
 	config, err := LoadConfig()
 	if err != nil {
 		zlog.Fatal().Err(err).Msg("config cannot be loaded")
 	}
 
+	// Initialize logger.
 	lvl, err := zerolog.ParseLevel(config.LogLevel)
 	if err != nil {
 		zlog.Fatal().Err(err).Msg("invalid log level")
 	}
 
 	zlog.Logger = zlog.Logger.Level(lvl)
+	logger := zlog.Logger
 
-	ctx, cancel := context.WithCancel(context.Background())
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-
+	// Load AWS config.
 	awsConfig, err := awsconf.LoadDefaultConfig(
 		ctx,
 		awsconf.WithCredentialsProvider(config),
@@ -59,8 +62,8 @@ func main() {
 		zlog.Fatal().Err(err).Msg("failed to load AWS config")
 	}
 
+	// Initialize storages.
 	dynamodbClient := dynamodb.NewFromConfig(awsConfig)
-
 	dockerhubCli := dockerhub.NewClient(dockerhub.DockerHubURL, dockerhub.DefaultMaxRPS)
 	tagStorage := dockertag.NewCache(ctx, dockertag.Config{
 		Image:          config.DockerImage.Name,
@@ -70,28 +73,9 @@ func main() {
 	}, dockerhubCli)
 	tagStorage.RunBackgroundUpdate()
 
-	// Create runners.
-	var runners []*coordinator.Runner
-	for _, r := range config.Runners {
-		var runner qrunner.Runner
-		switch r.Type {
-		case RunnerTypeEC2:
-			runner = newEC2Runner(ctx, r, awsConfig)
-
-		case RunnerTypeDockerEngine:
-			runner, err = newDockerEngineRunner(ctx, config.DockerImage, r, tagStorage)
-			if err != nil {
-				zlog.Fatal().Err(err).Msg("failed to create docker engine runner")
-			}
-
-		default:
-			zlog.Fatal().Msg("invalid runner")
-		}
-
-		runners = append(runners, coordinator.NewRunner(runner, r.Weight))
-	}
-
-	coord := coordinator.New(ctx, zlog.Logger, runners)
+	// Create runners and the coordinator.
+	runners := initializeRunners(ctx, config, awsConfig, tagStorage, logger)
+	coord := coordinator.New(ctx, logger, runners)
 	go func() {
 		err := coord.Start()
 		if err != nil {
@@ -99,12 +83,12 @@ func main() {
 		}
 	}()
 
+	// Initialize the REST server.
 	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWS.QueryRunsTableName)
 
 	lim := config.Limits
 	router := api.NewRouter(config.API.ServerTimeout, coord, tagStorage, runRepo, lim.MaxQueryLength, lim.MaxOutputLength)
 
-	// Start REST API server.
 	srv := &http.Server{
 		Addr:    config.API.ListeningAddress,
 		Handler: router,
@@ -146,84 +130,49 @@ func main() {
 	}
 }
 
-func newEC2Runner(ctx context.Context, config Runner, awsConfig aws.Config) *ec2.Runner {
-	return ec2.New(ctx, zlog.Logger, config.Name, ec2.DefaultConfig, awsConfig, config.EC2.InstanceID)
-}
+func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config, tagStorage *dockertag.Cache, logger zerolog.Logger) []*coordinator.Runner {
+	var runners []*coordinator.Runner
+	for _, r := range config.Runners {
+		var runner qrunner.Runner
+		switch r.Type {
+		case RunnerTypeEC2:
+			runner = ec2.New(ctx, logger, r.Name, ec2.DefaultConfig, awsConfig, r.EC2.InstanceID)
 
-func newDockerEngineRunner(ctx context.Context, img DockerImage, config Runner, tagStorage *dockertag.Cache) (*dockerengine.Runner, error) {
-	opts, err := getDockerEngineOpts(config.DockerEngine)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to build options for Docker client")
-	}
+		case RunnerTypeDockerEngine:
+			rcfg := dockerengine.DefaultConfig
+			rcfg.DaemonURL = r.DockerEngine.DaemonURL
+			rcfg.CustomConfigPath = r.DockerEngine.CustomConfigPath
+			rcfg.Repository = config.DockerImage.Name
+			rcfg.GC = nil
 
-	dockerCli, err := dockercli.NewClientWithOpts(opts...)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create Docker client")
-	}
+			gc := r.DockerEngine.GC
+			if gc != nil {
+				rcfg.GC = &dockerengine.GCConfig{
+					TriggerFrequency:      gc.TriggerFrequency,
+					ContainerTTL:          gc.ContainerTTL,
+					ImageGCCountThreshold: gc.ImageGCCountThreshold,
+					ImageBufferSize:       gc.ImageBufferSize,
+				}
+			}
 
-	ping, err := dockerCli.Ping(ctx)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to ping the docker daemon of %s runner", config.Name)
-	}
+			rcfg.Container = dockerengine.ContainerResources{
+				CPULimit:    uint64(r.DockerEngine.ContainerResources.CPULimit * 1e9), // cpu -> nano cpu.
+				CPUSet:      r.DockerEngine.ContainerResources.CPUSet,
+				MemoryLimit: uint64(r.DockerEngine.ContainerResources.MemoryLimitMB * 1e6), // mb -> bytes.
+			}
 
-	zlog.Info().
-		Str("runner_name", config.Name).
-		Str("api_version", ping.APIVersion).
-		Msg("established a connection with a docker daemon")
+			var err error
+			runner, err = dockerengine.New(ctx, logger, r.Name, rcfg, tagStorage)
+			if err != nil {
+				zlog.Fatal().Err(err).Msg("failed to create docker engine runner")
+			}
 
-	localCfg := dockerengine.DefaultConfig
-	localCfg.CustomConfigPath = config.DockerEngine.CustomConfigPath
-	localCfg.Repository = img.Name
-	localCfg.GC = nil
-
-	localCfg.Container = dockerengine.ContainerResources{
-		CPULimit:    uint64(config.DockerEngine.ContainerResources.CPULimit * 1e9), // cpu -> nano cpu.
-		CPUSet:      config.DockerEngine.ContainerResources.CPUSet,
-		MemoryLimit: uint64(config.DockerEngine.ContainerResources.MemoryLimitMB * 1e6), // mb -> bytes.
-	}
-
-	gc := config.DockerEngine.GC
-	if gc != nil {
-		localCfg.GC = &dockerengine.GCConfig{
-			TriggerFrequency:      gc.TriggerFrequency,
-			ContainerTTL:          gc.ContainerTTL,
-			ImageGCCountThreshold: gc.ImageGCCountThreshold,
-			ImageBufferSize:       gc.ImageBufferSize,
+		default:
+			zlog.Fatal().Msg("invalid runner")
 		}
+
+		runners = append(runners, coordinator.NewRunner(runner, r.Weight))
 	}
 
-	return dockerengine.New(ctx, zlog.Logger, config.Name, localCfg, dockerCli, tagStorage), nil
-}
-
-func getDockerEngineOpts(config *DockerEngine) ([]dockercli.Opt, error) {
-	opts := []dockercli.Opt{
-		dockercli.WithAPIVersionNegotiation(),
-	}
-
-	if config.DaemonURL == nil {
-		return opts, nil
-	}
-
-	// Set 'StrictHostKeyChecking=no' to simplify startup in Docker containers.
-	helper, err := connhelper.GetConnectionHelperWithSSHOpts(*config.DaemonURL, []string{"-o", "StrictHostKeyChecking=no"})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create ssh connection")
-	}
-	if helper == nil {
-		return nil, errors.Wrap(err, "provided daemon_url cannot be recognized by Docker lib")
-	}
-
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			DialContext: helper.Dialer,
-		},
-	}
-
-	opts = append(opts,
-		dockercli.WithHTTPClient(httpClient),
-		dockercli.WithHost(helper.Host),
-		dockercli.WithDialContext(helper.Dialer),
-	)
-
-	return opts, nil
+	return runners
 }

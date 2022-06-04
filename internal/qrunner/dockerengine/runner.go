@@ -47,11 +47,17 @@ type Runner struct {
 	status  *statusCollector
 }
 
-func New(ctx context.Context, logger zerolog.Logger, name string, cfg Config, cli *dockercli.Client, tagStorage ImageTagStorage) *Runner {
+func New(ctx context.Context, logger zerolog.Logger, name string, cfg Config, tagStorage ImageTagStorage) (*Runner, error) {
+	engine, err := newProvider(ctx, cfg.DaemonURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create Docker engine provider")
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
-	engine := newProvider(ctx, cli)
 
 	logger = logger.With().Str("runner", name).Logger()
+	gc := newGarbageCollector(ctx, logger, cfg.GC, cfg.Repository, engine, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name))
+	status := newStatusCollector(ctx, logger, cfg.Repository, cfg.StatusCollectionFrequency, engine, metrics.NewRunnerStatusExporter(string(qrunner.TypeDockerEngine), name))
 
 	return &Runner{
 		ctx:          ctx,
@@ -62,9 +68,9 @@ func New(ctx context.Context, logger zerolog.Logger, name string, cfg Config, cl
 		engine:       engine,
 		tagStorage:   tagStorage,
 		pipelineMetr: metrics.NewPipelineExporter(string(qrunner.TypeDockerEngine), name),
-		gc:           newGarbageCollector(ctx, logger, cfg.GC, cfg.Repository, engine, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name)),
-		status:       newStatusCollector(ctx, logger, cfg.Repository, cfg.StatusCollectionFrequency, engine, metrics.NewRunnerStatusExporter(string(qrunner.TypeDockerEngine), name)),
-	}
+		gc:           gc,
+		status:       status,
+	}, nil
 }
 
 func (r *Runner) Type() qrunner.Type {
@@ -91,7 +97,11 @@ func (r *Runner) Start() error {
 		r.status.start()
 	}()
 
-	r.logger.Info().Msg("runner has been started")
+	logCtx := r.logger.Info()
+	if r.cfg.DaemonURL != nil {
+		logCtx = logCtx.Str("daemon_url", *r.cfg.DaemonURL)
+	}
+	logCtx.Msg("runner has been started")
 
 	return nil
 }
