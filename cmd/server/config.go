@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"clickhouse-playground/internal/dockertag"
+	"clickhouse-playground/internal/qrunner/coordinator"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	gconfig "github.com/gookit/config/v2"
@@ -59,8 +60,9 @@ type AWS struct {
 }
 
 type Runner struct {
-	Type RunnerType `mapstructure:"type"`
-	Name string     `mapstructure:"name"`
+	Type   RunnerType `mapstructure:"type"`
+	Name   string     `mapstructure:"name"`
+	Weight uint       `mapstructure:"weight"`
 
 	EC2          *EC2          `mapstructure:"ec2"`
 	DockerEngine *DockerEngine `mapstructure:"docker_engine"`
@@ -88,6 +90,10 @@ type DockerEngineGC struct {
 func (r *Runner) Validate() error {
 	if r.Name == "" {
 		return errors.New("runner.name is required")
+	}
+
+	if r.Weight == 0 {
+		r.Weight = coordinator.DefaultWeight
 	}
 
 	switch r.Type {

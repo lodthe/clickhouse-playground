@@ -71,7 +71,7 @@ func main() {
 	tagStorage.RunBackgroundUpdate()
 
 	// Create runners.
-	var runners []qrunner.Runner
+	var runners []*coordinator.Runner
 	for _, r := range config.Runners {
 		var runner qrunner.Runner
 		switch r.Type {
@@ -88,7 +88,7 @@ func main() {
 			zlog.Fatal().Msg("invalid runner")
 		}
 
-		runners = append(runners, runner)
+		runners = append(runners, coordinator.NewRunner(runner, r.Weight))
 	}
 
 	coord := coordinator.New(ctx, zlog.Logger, runners)

@@ -26,10 +26,10 @@ type Coordinator struct {
 
 	random *rand.Rand
 
-	runners []qrunner.Runner
+	runners []*Runner
 }
 
-func New(ctx context.Context, logger zerolog.Logger, runners []qrunner.Runner) *Coordinator {
+func New(ctx context.Context, logger zerolog.Logger, runners []*Runner) *Coordinator {
 	ctx, cancel := context.WithCancel(ctx)
 
 	// It's okay to initialize by setting time, because it's just for load balancing among runners.
@@ -59,9 +59,9 @@ func (c *Coordinator) Start() error {
 	}
 
 	for _, r := range c.runners {
-		err := r.Start()
+		err := r.underlying.Start()
 		if err != nil {
-			return errors.Wrapf(err, "%s cannot be started", r.Name())
+			return errors.Wrapf(err, "%s cannot be started", r.underlying.Name())
 		}
 	}
 
@@ -76,9 +76,9 @@ func (c *Coordinator) Stop() error {
 	c.logger.Info().Msg("stopping coordinator")
 
 	for _, r := range c.runners {
-		err := r.Stop()
+		err := r.underlying.Stop()
 		if err != nil {
-			c.logger.Err(err).Str("underlying", r.Name()).Msg("runner cannot be stopped")
+			c.logger.Err(err).Str("underlying", r.underlying.Name()).Msg("runner cannot be stopped")
 		}
 	}
 
@@ -89,7 +89,30 @@ func (c *Coordinator) Stop() error {
 
 // RunQuery proxies queries to one of the underlying runners.
 func (c *Coordinator) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
-	runner := c.runners[c.random.Intn(len(c.runners))]
+	r := c.selectRunner()
+	if r == nil {
+		return "", errors.New("no alive runners")
+	}
 
-	return runner.RunQuery(ctx, runID, query, version)
+	return r.underlying.RunQuery(ctx, runID, query, version)
+}
+
+// selectRunner selects a random runner (weight is considered).
+// If the weight of r1 is 10 times the weight of r2, r1 is selected 10 times more often.
+func (c *Coordinator) selectRunner() *Runner {
+	var totalWeight uint64
+	for _, r := range c.runners {
+		totalWeight += uint64(r.weight)
+	}
+
+	rnd := c.random.Uint64() % totalWeight
+	for _, r := range c.runners {
+		if rnd < uint64(r.weight) {
+			return r
+		}
+
+		rnd -= uint64(r.weight)
+	}
+
+	return nil
 }
