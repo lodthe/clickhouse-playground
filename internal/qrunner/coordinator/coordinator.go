@@ -58,14 +58,29 @@ func (c *Coordinator) Start() error {
 		return errors.New("coordinator has already been started")
 	}
 
+	c.logger.Info().Int("count", len(c.runners)).Msg("starting...")
+
+	var totalWeight uint64
+	var count uint
 	for _, r := range c.runners {
+		totalWeight += uint64(r.weight)
+		if r.weight == 0 {
+			continue
+		}
+
 		err := r.underlying.Start()
 		if err != nil {
 			return errors.Wrapf(err, "%s cannot be started", r.underlying.Name())
 		}
+
+		count++
 	}
 
-	c.logger.Info().Int("count", len(c.runners)).Msg("underlying runners have been started")
+	if totalWeight == 0 {
+		return errors.New("total runners weight must be > 0")
+	}
+
+	c.logger.Info().Uint("count", count).Msg("underlying runners have been started")
 
 	return nil
 }
@@ -76,6 +91,10 @@ func (c *Coordinator) Stop() error {
 	c.logger.Info().Msg("stopping coordinator")
 
 	for _, r := range c.runners {
+		if r.weight == 0 {
+			continue
+		}
+
 		err := r.underlying.Stop()
 		if err != nil {
 			c.logger.Err(err).Str("underlying", r.underlying.Name()).Msg("runner cannot be stopped")
@@ -103,6 +122,10 @@ func (c *Coordinator) selectRunner() *Runner {
 	var totalWeight uint64
 	for _, r := range c.runners {
 		totalWeight += uint64(r.weight)
+	}
+
+	if totalWeight == 0 {
+		return nil
 	}
 
 	rnd := c.random.Uint64() % totalWeight

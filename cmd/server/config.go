@@ -14,6 +14,7 @@ import (
 	gyaml "github.com/gookit/config/v2/yaml"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	zlog "github.com/rs/zerolog/log"
 )
 
 const DefaultConfigPath = "config.yaml"
@@ -94,6 +95,7 @@ func (r *Runner) Validate() error {
 
 	if r.Weight == 0 {
 		r.Weight = coordinator.DefaultWeight
+		zlog.Debug().Str("runner", r.Name).Int("new_value", coordinator.DefaultWeight).Msg("weight has been set")
 	}
 
 	switch r.Type {
@@ -209,8 +211,8 @@ func (c *Config) validate() error {
 		return errors.New("empty runner list")
 	}
 
-	for _, r := range c.Runners {
-		err := r.Validate()
+	for i := range c.Runners {
+		err := c.Runners[i].Validate()
 		if err != nil {
 			return errors.Wrap(err, "runner validation")
 		}

@@ -14,6 +14,14 @@ type Config struct {
 	GC *GCConfig
 
 	StatusCollectionFrequency time.Duration
+
+	Container ContainerResources
+}
+
+type ContainerResources struct {
+	CPULimit    uint64 // In nano cpus (1 core = 1e9 nano cpus). If 0, then unlimited.
+	CPUSet      string // A comma-separated list or hyphen-separated range of CPUs a container can use. If "", then any cores can be used.
+	MemoryLimit uint64 // In bytes. If 0, then unlimited.
 }
 
 type GCConfig struct {
@@ -52,4 +60,10 @@ var DefaultConfig = Config{
 	},
 
 	StatusCollectionFrequency: 30 * time.Second,
+
+	Container: ContainerResources{
+		CPULimit:    2 * 1e9,
+		CPUSet:      "",
+		MemoryLimit: 1 * 1e9,
+	},
 }

@@ -239,7 +239,13 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 		Labels: qrunner.CreateContainerLabels(state.runID, state.version),
 	}
 
-	hostConfig := new(container.HostConfig)
+	hostConfig := &container.HostConfig{
+		Resources: container.Resources{
+			NanoCPUs:   int64(r.cfg.Container.CPULimit),
+			CpusetCpus: r.cfg.Container.CPUSet,
+			Memory:     int64(r.cfg.Container.MemoryLimit),
+		},
+	}
 
 	// A custom config is used to disable some ClickHouse features to speed up the startup.
 	if r.cfg.CustomConfigPath != nil {
