@@ -18,6 +18,8 @@ import (
 )
 
 const DefaultConfigPath = "config.yaml"
+const DefaultMaxQueryLength = 2500
+const DefaultMaxOutputLength = 25000
 
 type RunnerType string
 
@@ -33,11 +35,18 @@ type Config struct {
 
 	API API `mapstructure:"api"`
 
+	Limits Limits `mapstructure:"limits"`
+
 	PrometheusExportAddress string `mapstructure:"prometheus_address"`
 
 	AWS AWS `mapstructure:"aws"`
 
 	Runners []Runner `mapstructure:"runners"`
+}
+
+type Limits struct {
+	MaxQueryLength  uint64 `mapstructure:"max_query_length"`
+	MaxOutputLength uint64 `mapstructure:"max_output_length"`
 }
 
 type DockerImage struct {
@@ -202,6 +211,13 @@ func (c *Config) validate() error {
 	}
 	if c.API.ServerTimeout == 0 {
 		c.API.ServerTimeout = 60 * time.Second
+	}
+
+	if c.Limits.MaxQueryLength == 0 {
+		c.Limits.MaxQueryLength = DefaultMaxQueryLength
+	}
+	if c.Limits.MaxOutputLength == 0 {
+		c.Limits.MaxOutputLength = DefaultMaxOutputLength
 	}
 
 	if c.PrometheusExportAddress == "" {

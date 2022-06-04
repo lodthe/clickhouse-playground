@@ -101,7 +101,8 @@ func main() {
 
 	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWS.QueryRunsTableName)
 
-	router := api.NewRouter(coord, tagStorage, runRepo, config.DockerImage.Name, config.API.ServerTimeout)
+	lim := config.Limits
+	router := api.NewRouter(config.API.ServerTimeout, coord, tagStorage, runRepo, lim.MaxQueryLength, lim.MaxOutputLength)
 
 	// Start REST API server.
 	srv := &http.Server{

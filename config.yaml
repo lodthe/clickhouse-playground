@@ -21,6 +21,17 @@ api:
   # [OPTIONAL] Request processing timeout. Default: 60s.
   server_timeout: 60s
 
+# You can set some limits to prevent budget waste on storage and etc.
+limits:
+  # If the length of a user's query exceeds this limit, the request is aborted.
+  # Default: 2500.
+  max_query_length: 2500
+
+  # If the length of a user's query execution result exceeds this limit, the request is aborted and
+  # output is not saved to the storage.
+  # Default: 25000.
+  max_output_length: 25000
+
 # [OPTIONAL] Prometheus metrics export address. Default: :2112.
 prometheus_address: :2112
 

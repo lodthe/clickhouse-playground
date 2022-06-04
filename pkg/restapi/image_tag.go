@@ -7,14 +7,12 @@ import (
 )
 
 type imageTagHandler struct {
-	tagStorage    TagStorage
-	chServerImage string
+	tagStorage TagStorage
 }
 
-func newImageTagHandler(storage TagStorage, chServerImage string) *imageTagHandler {
+func newImageTagHandler(storage TagStorage) *imageTagHandler {
 	return &imageTagHandler{
-		tagStorage:    storage,
-		chServerImage: chServerImage,
+		tagStorage: storage,
 	}
 }
 

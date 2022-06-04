@@ -15,7 +15,11 @@ import (
 	"github.com/go-chi/cors"
 )
 
-func NewRouter(runner qrunner.Runner, tagStorage TagStorage, runRepo queryrun.Repository, chServerImage string, timeout time.Duration) http.Handler {
+type RouterOpts struct {
+	DockerRepository string
+}
+
+func NewRouter(timeout time.Duration, runner qrunner.Runner, tagStorage TagStorage, runRepo queryrun.Repository, maxQueryLength, maxOutputLength uint64) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(metricsMiddleware)
@@ -37,8 +41,8 @@ func NewRouter(runner qrunner.Runner, tagStorage TagStorage, runRepo queryrun.Re
 	}))
 
 	r.Route("/api", func(r chi.Router) {
-		newQueryHandler(runner, runRepo, tagStorage, chServerImage).handle(r)
-		newImageTagHandler(tagStorage, chServerImage).handle(r)
+		newQueryHandler(runner, runRepo, tagStorage, maxQueryLength, maxOutputLength).handle(r)
+		newImageTagHandler(tagStorage).handle(r)
 	})
 
 	return r
