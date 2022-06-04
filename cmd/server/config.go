@@ -35,9 +35,7 @@ type Config struct {
 
 	AWS AWS `mapstructure:"aws"`
 
-	CustomConfigPath *string `mapstructure:"custom_config_path"`
-
-	Runner Runner `mapstructure:"runner"`
+	Runners []Runner `mapstructure:"runners"`
 }
 
 type DockerImage struct {
@@ -73,8 +71,9 @@ type EC2 struct {
 }
 
 type DockerEngine struct {
-	DaemonURL *string         `mapstructure:"daemon_url"`
-	GC        *DockerEngineGC `mapstructure:"gc"`
+	DaemonURL        *string         `mapstructure:"daemon_url"`
+	CustomConfigPath *string         `mapstructure:"custom_config_path"`
+	GC               *DockerEngineGC `mapstructure:"gc"`
 }
 
 type DockerEngineGC struct {
@@ -94,7 +93,7 @@ func (r *Runner) Validate() error {
 	switch r.Type {
 	case RunnerTypeEC2:
 		if r.EC2 == nil {
-			return errors.New("runner.ec2 is required when runner.type is EC2")
+			return errors.Errorf("[%s] runner.ec2 is required when runner.type is EC2", r.Name)
 		}
 		if r.EC2.InstanceID == "" {
 			return errors.New("runner.ec2.instance_id is required when runner.type is EC2")
@@ -112,14 +111,14 @@ func (r *Runner) Validate() error {
 
 		daemonURL := r.DockerEngine.DaemonURL
 		if daemonURL != nil && !strings.HasPrefix(*daemonURL, "ssh://") {
-			return errors.Errorf("runner.docker_daemon.daemon_url must be empty or start with 'ssh://', but %s found", *daemonURL)
+			return errors.Errorf("[%s] runner.docker_daemon.daemon_url must be empty or start with 'ssh://', but %s found", r.Name, *daemonURL)
 		}
 
 	case "":
-		return errors.New("runner.type is required")
+		return errors.Errorf("[%s] runner.type is required", r.Name)
 
 	default:
-		return errors.Errorf("unknown runner type %s (supported: %s, %s)", r.Type, RunnerTypeEC2, RunnerTypeDockerEngine)
+		return errors.Errorf("unknown runner %s type %s (supported: %s, %s)", r.Name, r.Type, RunnerTypeEC2, RunnerTypeDockerEngine)
 	}
 
 	return nil
@@ -200,9 +199,15 @@ func (c *Config) validate() error {
 		return errors.New("aws.query_runs_table is required")
 	}
 
-	err := c.Runner.Validate()
-	if err != nil {
-		return errors.Wrap(err, "runner validation")
+	if len(c.Runners) == 0 {
+		return errors.New("empty runner list")
+	}
+
+	for _, r := range c.Runners {
+		err := r.Validate()
+		if err != nil {
+			return errors.Wrap(err, "runner validation")
+		}
 	}
 
 	return nil

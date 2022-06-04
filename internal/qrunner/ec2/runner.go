@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/pkg/errors"
-	zlog "github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 // Runner is a EC2 type runner that executes SQL queries on the specified Amazon EC2 instance via Amazon SSM.
@@ -23,6 +23,8 @@ type Runner struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	logger zerolog.Logger
+
 	name string
 	cfg  Config
 
@@ -30,12 +32,13 @@ type Runner struct {
 	instanceID string
 }
 
-func New(ctx context.Context, name string, cfg Config, awsConfig aws.Config, instanceID string) *Runner {
+func New(ctx context.Context, logger zerolog.Logger, name string, cfg Config, awsConfig aws.Config, instanceID string) *Runner {
 	ctx, cancel := context.WithCancel(ctx)
 
 	return &Runner{
 		ctx:        ctx,
 		cancel:     cancel,
+		logger:     logger.With().Str("runner", name).Logger(),
 		name:       name,
 		cfg:        cfg,
 		ssm:        ssm.NewFromConfig(awsConfig),
@@ -52,7 +55,7 @@ func (r *Runner) Name() string {
 }
 
 func (r *Runner) Start() error {
-	zlog.Info().Msg("Start is not implemented for the ec2 runner")
+	r.logger.Info().Msg("Start is not implemented for the ec2 runner")
 
 	return nil
 }
@@ -72,7 +75,7 @@ func (r *Runner) RunQuery(ctx context.Context, runID string, query string, versi
 	defer func() {
 		err := r.killContainer(r.ctx, containerID)
 		if err != nil {
-			zlog.Err(err).
+			r.logger.Err(err).
 				Str("run_id", runID).
 				Str("container_id", containerID).
 				Msg("failed to kill container")
@@ -104,7 +107,7 @@ func (r *Runner) sendCommand(ctx context.Context, cmd string) (stdout string, st
 		return "", "", errors.New("missed command")
 	}
 
-	zlog.Debug().Str("id", *sendOutput.Command.CommandId).Str("command", cmd).Msg("sent a command to SSM")
+	r.logger.Debug().Str("id", *sendOutput.Command.CommandId).Str("command", cmd).Msg("sent a command to SSM")
 
 	for {
 		invocation, err := r.ssm.GetCommandInvocation(ctx, &ssm.GetCommandInvocationInput{
@@ -114,7 +117,7 @@ func (r *Runner) sendCommand(ctx context.Context, cmd string) (stdout string, st
 		if err != nil {
 			var invocationDoesNotExist *ssmtypes.InvocationDoesNotExist
 			if errors.As(err, &invocationDoesNotExist) {
-				zlog.Debug().Str("id", *sendOutput.Command.CommandId).Msg("invocation doesn't exist")
+				r.logger.Debug().Str("id", *sendOutput.Command.CommandId).Msg("invocation doesn't exist")
 				time.Sleep(50 * time.Millisecond)
 
 				continue

@@ -91,12 +91,18 @@ func (r *Runner) Start() error {
 		r.status.start()
 	}()
 
+	r.logger.Info().Msg("runner has been started")
+
 	return nil
 }
 
 func (r *Runner) Stop() error {
+	r.logger.Info().Msg("stopping")
+
 	r.cancel()
 	r.workers.Wait()
+
+	r.logger.Info().Msg("runner has been stopped")
 
 	return nil
 }
@@ -171,12 +177,12 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 	}
 
 	// We should read the output to be sure that the image has been pulled.
-	output, err := io.ReadAll(out)
+	_, err = io.ReadAll(out)
 	if err != nil {
 		r.logger.Error().Err(err).Str("image", imageName).Msg("failed to read pull output")
 	}
 
-	r.logger.Debug().Str("image", imageName).Str("output", string(output)).Msg("base image has been pulled")
+	r.logger.Debug().Str("image", imageName).Msg("base image has been pulled")
 
 	err = r.engine.addImageTag(ctx, imageName, state.chpImageName)
 	if err != nil {
