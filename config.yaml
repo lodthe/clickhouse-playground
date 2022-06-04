@@ -37,63 +37,64 @@ aws:
 # [OPTIONAL] Absolute path to the custom config used on clickhouse-server startup.
 # custom_config_path: /fast-startup-config.xml
 
-runner:
-  # Available types: EC2, DOCKER_ENGINE.
-  type: DOCKER_ENGINE
-  name: default
+runners:
+  # You can specify several runners. The coordinator will load balance incoming queries among them.
+  - # Available types: EC2, DOCKER_ENGINE.
+    type: DOCKER_ENGINE
+    name: default
 
-  # Required if type is EC2.
-  ec2:
-    # AWS EC2 instance id used to run queries.
-    instance_id: i-023c5bb002bb45ad4
+    # Required if type is EC2.
+    ec2:
+      # AWS EC2 instance id used to run queries.
+      instance_id: i-023c5bb002bb45ad4
 
-  # Required if type is DOCKER_ENGINE.
-  docker_engine:
-    # [OPTIONAL] You can provide an SSH Docker Daemon URL to start containers remotely.
-    # Specified URL must start with "ssh://" and should be a valid SSH connection URL. It's like
-    # when you connect to a server via SSH and type "ssh user@host:port".
-    # To get the same effect, you should set daemon_url to "ssh://user@host:port".
-    #
-    # The playground just executes the ssh binary with the specified URL. Keep in mind the following points,
-    # especially if you are running the playground in a Docker container:
-    #
-    # 1) There is must be the ssh executable in the running system, and it must be available
-    #    for playground to run it. Usually, you can install the openssh-client package to get the ssh executable.
-    # 2) You can specify a shorthand SSH host in the SSH config (~/.ssh/config or /etc/ssh/ssh_config) and use it.
-    #
-    #    For example, if you have the following configuration
-    #    ---
-    #    Host playground-1
-    #	   HostName playground-1.example.com
-    #	   User lodthe
-    #	   Port 22
-    #	   IdentityFile ~/.ssh/playground_1.pem
-    #   ---
-    #   you can set daemon_url to "playground-1", and it will work correctly!
-    #
-    #
-    # Default: local "unix:///var/run/docker.sock" is used.
-    # daemon_url: ssh://clickhouse-playground
+    # Required if type is DOCKER_ENGINE.
+    docker_engine:
+      # [OPTIONAL] You can provide an SSH Docker Daemon URL to start containers remotely.
+      # Specified URL must start with "ssh://" and should be a valid SSH connection URL. It's like
+      # when you connect to a server via SSH and type "ssh user@host:port".
+      # To get the same effect, you should set daemon_url to "ssh://user@host:port".
+      #
+      # The playground just executes the ssh binary with the specified URL. Keep in mind the following points,
+      # especially if you are running the playground in a Docker container:
+      #
+      # 1) There is must be the ssh executable in the running system, and it must be available
+      #    for playground to run it. Usually, you can install the openssh-client package to get the ssh executable.
+      # 2) You can specify a shorthand SSH host in the SSH config (~/.ssh/config or /etc/ssh/ssh_config) and use it.
+      #
+      #    For example, if you have the following configuration
+      #    ---
+      #    Host playground-1
+      #	   HostName playground-1.example.com
+      #	   User lodthe
+      #	   Port 22
+      #	   IdentityFile ~/.ssh/playground_1.pem
+      #   ---
+      #   you can set daemon_url to "playground-1", and it will work correctly!
+      #
+      #
+      # Default: local "unix:///var/run/docker.sock" is used.
+      # daemon_url: ssh://clickhouse-playground
 
-    # You can configure the garbage collector to prune hanged up containers and images.
-    # If the field is missed, gc is disabled.
-    # Default: gc is disabled.
-    gc:
-      # [OPTIONAL] How often the garbage collector should be triggered. Default: once a minute.
-      trigger_frequency: 1m
+      # You can configure the garbage collector to prune hanged up containers and images.
+      # If the field is missed, gc is disabled.
+      # Default: gc is disabled.
+      gc:
+        # [OPTIONAL] How often the garbage collector should be triggered. Default: once a minute.
+        trigger_frequency: 1m
 
-      # Containers GC
+        # Containers GC
 
-      # [OPTIONAL] Containers created before (NOW() - TTL) are force removed.
-      # Default: disabled (containers are not force removed).
-      container_ttl: 1m
+        # [OPTIONAL] Containers created before (NOW() - TTL) are force removed.
+        # Default: disabled (containers are not force removed).
+        container_ttl: 1m
 
-      # Images GC
+        # Images GC
 
-      # Image gc triggers when there are at least image_count_threshold downloaded images.
-      # Default: missed (images are not pruned).
-      image_count_threshold: 50
+        # Image gc triggers when there are at least image_count_threshold downloaded images.
+        # Default: missed (images are not pruned).
+        image_count_threshold: 50
 
-      # # After the images garbage collection, at most image_buffer_size least recently tagged images will be left.
-      # Default: 0 (all images are pruned).
-      image_buffer_size: 30
+        # # After the images garbage collection, at most image_buffer_size least recently tagged images will be left.
+        # Default: 0 (all images are pruned).
+        image_buffer_size: 30

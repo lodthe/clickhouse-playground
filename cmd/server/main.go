@@ -10,6 +10,7 @@ import (
 
 	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/qrunner"
+	"clickhouse-playground/internal/qrunner/coordinator"
 	"clickhouse-playground/internal/qrunner/dockerengine"
 	"clickhouse-playground/internal/qrunner/ec2"
 	"clickhouse-playground/internal/queryrun"
@@ -70,24 +71,29 @@ func main() {
 	tagStorage.RunBackgroundUpdate()
 
 	// Create runners.
-	var runner qrunner.Runner
-	switch config.Runner.Type {
-	case RunnerTypeEC2:
-		runner = newEC2Runner(ctx, &config.Runner, awsConfig)
+	var runners []qrunner.Runner
+	for _, r := range config.Runners {
+		var runner qrunner.Runner
+		switch r.Type {
+		case RunnerTypeEC2:
+			runner = newEC2Runner(ctx, r, awsConfig)
 
-	case RunnerTypeDockerEngine:
-		runner, err = newDockerEngineRunner(ctx, config, tagStorage)
-		if err != nil {
-			zlog.Fatal().Err(err).Msg("failed to create docker engine runner")
+		case RunnerTypeDockerEngine:
+			runner, err = newDockerEngineRunner(ctx, config.DockerImage, r, tagStorage)
+			if err != nil {
+				zlog.Fatal().Err(err).Msg("failed to create docker engine runner")
+			}
+
+		default:
+			zlog.Fatal().Msg("invalid runner")
 		}
 
-	default:
-		zlog.Fatal().Msg("invalid runner")
+		runners = append(runners, runner)
 	}
 
-	// Start the runner gc.
+	coord := coordinator.New(ctx, zlog.Logger, runners)
 	go func() {
-		err := runner.Start()
+		err := coord.Start()
 		if err != nil {
 			zlog.Fatal().Err(err).Msg("runner cannot be started")
 		}
@@ -95,7 +101,7 @@ func main() {
 
 	runRepo := queryrun.NewRepository(ctx, dynamodbClient, config.AWS.QueryRunsTableName)
 
-	router := api.NewRouter(runner, tagStorage, runRepo, config.DockerImage.Name, config.API.ServerTimeout)
+	router := api.NewRouter(coord, tagStorage, runRepo, config.DockerImage.Name, config.API.ServerTimeout)
 
 	// Start REST API server.
 	srv := &http.Server{
@@ -128,9 +134,9 @@ func main() {
 	shutdownCtx, shutdown := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer shutdown()
 
-	err = runner.Stop()
+	err = coord.Stop()
 	if err != nil {
-		zlog.Err(err).Msg("runner cannot be stopped")
+		zlog.Err(err).Msg("coordinator cannot be stopped")
 	}
 
 	err = srv.Shutdown(shutdownCtx)
@@ -139,12 +145,12 @@ func main() {
 	}
 }
 
-func newEC2Runner(ctx context.Context, config *Runner, awsConfig aws.Config) *ec2.Runner {
-	return ec2.New(ctx, config.Name, ec2.DefaultConfig, awsConfig, config.EC2.InstanceID)
+func newEC2Runner(ctx context.Context, config Runner, awsConfig aws.Config) *ec2.Runner {
+	return ec2.New(ctx, zlog.Logger, config.Name, ec2.DefaultConfig, awsConfig, config.EC2.InstanceID)
 }
 
-func newDockerEngineRunner(ctx context.Context, config *Config, tagStorage *dockertag.Cache) (*dockerengine.Runner, error) {
-	opts, err := getDockerEngineOpts(config.Runner.DockerEngine)
+func newDockerEngineRunner(ctx context.Context, img DockerImage, config Runner, tagStorage *dockertag.Cache) (*dockerengine.Runner, error) {
+	opts, err := getDockerEngineOpts(config.DockerEngine)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build options for Docker client")
 	}
@@ -156,20 +162,20 @@ func newDockerEngineRunner(ctx context.Context, config *Config, tagStorage *dock
 
 	ping, err := dockerCli.Ping(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to ping the docker daemon of %s runner", config.Runner.Name)
+		return nil, errors.Wrapf(err, "failed to ping the docker daemon of %s runner", config.Name)
 	}
 
 	zlog.Info().
-		Str("runner_name", config.Runner.Name).
+		Str("runner_name", config.Name).
 		Str("api_version", ping.APIVersion).
 		Msg("established a connection with a docker daemon")
 
 	localCfg := dockerengine.DefaultConfig
-	localCfg.CustomConfigPath = config.CustomConfigPath
-	localCfg.Repository = config.DockerImage.Name
+	localCfg.CustomConfigPath = config.DockerEngine.CustomConfigPath
+	localCfg.Repository = img.Name
 	localCfg.GC = nil
 
-	gc := config.Runner.DockerEngine.GC
+	gc := config.DockerEngine.GC
 	if gc != nil {
 		localCfg.GC = &dockerengine.GCConfig{
 			TriggerFrequency:      gc.TriggerFrequency,
@@ -179,7 +185,7 @@ func newDockerEngineRunner(ctx context.Context, config *Config, tagStorage *dock
 		}
 	}
 
-	return dockerengine.New(ctx, zlog.Logger, config.Runner.Name, localCfg, dockerCli, tagStorage), nil
+	return dockerengine.New(ctx, zlog.Logger, config.Name, localCfg, dockerCli, tagStorage), nil
 }
 
 func getDockerEngineOpts(config *DockerEngine) ([]dockercli.Opt, error) {
