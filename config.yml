@@ -82,8 +82,8 @@ runners:
       #	   User lodthe
       #	   Port 22
       #	   IdentityFile ~/.ssh/playground_1.pem
-      #   ---
-      #   you can set daemon_url to "playground-1", and it will work correctly!
+      #    ---
+      #    you can set daemon_url to "playground-1", and it will work correctly!
       #
       #
       # Default: local "unix:///var/run/docker.sock" is used.
