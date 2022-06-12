@@ -9,7 +9,7 @@
                 <queries>50</queries>
                 <errors>50</errors>
                 <result_rows>10000</result_rows>
-                <read_rows>50000</read_rows>
+                <read_rows>1000000</read_rows>
                 <execution_time>100</execution_time>
             </interval>
         </default>
