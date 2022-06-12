@@ -17,7 +17,7 @@ import (
 	zlog "github.com/rs/zerolog/log"
 )
 
-const DefaultConfigPath = "config.yaml"
+const DefaultConfigPath = "config.yml"
 const DefaultMaxQueryLength = 2500
 const DefaultMaxOutputLength = 25000
 

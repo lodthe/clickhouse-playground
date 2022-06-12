@@ -1,4 +1,4 @@
-# The default config location is 'config.yaml', but it can be overridden via CONFIG_PATH env.
+# The default config location is 'config.yml', but it can be overridden via CONFIG_PATH env.
 
 # [OPTIONAL] Log redundancy level. Default: debug.
 # Available log levels: trace (all), debug, info, warn, error, fatal, disabled.
@@ -85,8 +85,8 @@ runners:
       #	   User lodthe
       #	   Port 22
       #	   IdentityFile ~/.ssh/playground_1.pem
-      #   ---
-      #   you can set daemon_url to "playground-1", and it will work correctly!
+      #    ---
+      #    you can set daemon_url to "playground-1", and it will work correctly!
       #
       #
       # Default: local "unix:///var/run/docker.sock" is used.

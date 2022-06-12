@@ -148,9 +148,10 @@ func (r *Runner) RunQuery(ctx context.Context, runID string, query string, versi
 			r.pipelineMetr.RemoveContainer(err == nil, "", startedAt)
 		}()
 
-		err = r.engine.removeContainer(r.ctx, state.containerID, true)
+		err := r.engine.removeContainer(r.ctx, state.containerID, true)
 		if err != nil {
 			r.logger.Error().Err(err).Str("run_id", state.runID).Msg("failed to kill container")
+			return
 		}
 
 		r.logger.Debug().Str("container_id", state.containerID).Msg("container has been force removed")
