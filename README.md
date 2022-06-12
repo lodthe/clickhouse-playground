@@ -7,7 +7,7 @@ and share the execution results with others.
 Try it out: [playground.lodthe.me](https://playground.lodthe.me).
 
 This repository contains back-end logic of the platform. 
-The web application is available [here](https://github.com/lodthe/clickhouse-playground-ui).
+The source code of the web application is available [here](https://github.com/lodthe/clickhouse-playground-ui).
 
 ## Architecture overview
 
