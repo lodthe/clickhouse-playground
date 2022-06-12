@@ -92,8 +92,9 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	timeElapsed := time.Since(startedAt)
-
 	run.Output = output
+	run.ExecutionTime = timeElapsed
+
 	err = h.runRepo.Create(run)
 	if err != nil {
 		zlog.Error().Err(err).Interface("model", run).Msg("a run cannot be saved")
