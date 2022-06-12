@@ -39,8 +39,8 @@ func TestCoordinator_selectRunner_EqualWeights(t *testing.T) {
 
 func TestCoordinator_selectRunner_DifferentWeights(t *testing.T) {
 	const runnerCount = 5
-	const samples = 10000
-	const maxDeviation = 0.1
+	const samples = 20000
+	const maxDeviation = 0.2
 
 	var runners []*Runner
 	var totalWeight float64
