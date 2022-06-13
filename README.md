@@ -1,7 +1,5 @@
 # ClickHouse Playground
 
-[![last-docker-image-version](https://img.shields.io/docker/v/lodthe/clickhouse-playground?sort=semver)](https://hub.docker.com/r/lodthe/clickhouse-playground)
-
 ClickHouse Playground is a tool for running SQL queries online, from a browser.
 It allows ClickHouse community to run any queries in arbitrary ClickHouse version
 and share the execution results with others.
