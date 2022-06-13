@@ -72,25 +72,25 @@ The base URI is `https://playground.lodthe.me/api`.
 Get available ClickHouse versions that can be used for running a query.
 Returned versions are just DockerHub image tags.
 
-<table>
-    <thead>
-        <tr>
-            <th>Field name</th>
-            <th>Field type</th>
-            <th>Description</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td colspan=3 style="text-align: center;">Response payload</td>
-        </tr>
-        <tr>
-            <td rowspan=1>tags</td>
-            <td rowspan=1>array[string]</td>
-            <td>List of available ClickHouse versions (tags).</td>
-        </tr>
-    </tbody>
-</table>
+<details>
+    <summary>Response payload</summary>
+    <table>
+        <thead>
+            <tr>
+                <th>Field name</th>
+                <th>Field type</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td rowspan=1>tags</td>
+                <td rowspan=1>array[string]</td>
+                <td>List of available ClickHouse versions (tags).</td>
+            </tr>
+        </tbody>
+    </table>
+</details>
 
 Example:
 ```yml
@@ -112,56 +112,67 @@ curl -XGET https://playground.lodthe.me/api/tags
 
 ### Run a query
 
-| Endpoint | /runs |
-|----------|-------|
-| Method   | POST  |
+| POST   | /runs |
+|--------|-------|
 
 The title speaks for itself.  Keep in mind, a new container is created 
 for an incoming request, so it may some time to process the query 
 (15 &ndash; 20 seconds for absent images).
 
-<table>
-    <thead>
-        <tr>
-            <th>Field name</th>
-            <th>Field type</th>
-            <th>Description</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td colspan=3 style="text-align: center;">Request body</td>
-        </tr>
-        <tr>
-            <td rowspan=1>version</td>
-            <td rowspan=1>string</td>
-            <td>A desired version of ClickHouse where the query will be run.</td>
-        </tr>
-        <tr>
-            <td rowspan=1>input</td>
-            <td rowspan=1>string</td>
-            <td>Semicolon-separated list of SQL queries that will be run.</td>
-        </tr>
-        <tr>
-            <td colspan=3 style="text-align: center;">Response payload</td>
-        </tr>
-        <tr>
-            <td rowspan=1>query_run_id</td>
-            <td rowspan=1>string</td>
-            <td>May be used to get the query run details.</td>
-        </tr>
-        <tr>
-            <td>output</td>
-            <td>string</td>
-            <td>Query run execution result.</td>
-        </tr>
-        <tr>
-            <td>time_elapsed</td>
-            <td>string</td>
-            <td>How long it took to process the query on the server side.</td>
-        </tr>
-    </tbody>
-</table>
+<details>
+    <summary>Request body</summary>
+    <table>
+        <thead>
+            <tr>
+                <th>Field name</th>
+                <th>Field type</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td rowspan=1>version</td>
+                <td rowspan=1>string</td>
+                <td>A desired version of ClickHouse where the query will be run.</td>
+            </tr>
+            <tr>
+                <td rowspan=1>input</td>
+                <td rowspan=1>string</td>
+                <td>Semicolon-separated list of SQL queries that will be run.</td>
+            </tr>
+        </tbody>
+    </table>
+</details>
+
+<details>
+    <summary>Response payload</summary>
+    <table>
+        <thead>
+            <tr>
+                <th>Field name</th>
+                <th>Field type</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td rowspan=1>query_run_id</td>
+                <td rowspan=1>string</td>
+                <td>May be used to get the query run details.</td>
+            </tr>
+            <tr>
+                <td>output</td>
+                <td>string</td>
+                <td>Query run execution result.</td>
+            </tr>
+            <tr>
+                <td>time_elapsed</td>
+                <td>string</td>
+                <td>How long it took to process the query on the server side.</td>
+            </tr>
+        </tbody>
+    </table>
+</details>
 
 Example:
 ```yml
@@ -183,54 +194,63 @@ curl -XPOST https://playground.lodthe.me/api/runs -d '{ \
 ### Get a query execution result
 
 
-| Endpoint | /runs/{query_run_id} |
-|----------|----------------------|
-| Method   | GET                  |
+| GET    | /runs/{query_run_id} |
+|--------|----------------------|
 
 You can get information about a previously processed query.
 
-<table>
-    <thead>
-        <tr>
-            <th>Field name</th>
-            <th>Field type</th>
-            <th>Description</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td colspan=3 style="text-align: center;">Endpoint parameters</td>
-        </tr>
-        <tr>
-            <td rowspan=1>query_run_id</td>
-            <td rowspan=1>string</td>
-            <td>ID of a finished query run.</td>
-        </tr>
-        <tr>
-            <td colspan=3><center>Response payload</center></td>
-        </tr>
-        <tr>
-            <td rowspan=1>query_run_id</td>
-            <td rowspan=1>string</td>
-            <td>A unique identifier of the executed query.</td>
-        </tr>
-        <tr>
-            <td rowspan=1>version</td>
-            <td rowspan=1>string</td>
-            <td>What ClickHouse version has been used to run the query.</td>
-        </tr>
-        <tr>
-            <td>input</td>
-            <td>string</td>
-            <td>Provided queries.</td>
-        </tr>
-        <tr>
-            <td>output</td>
-            <td>string</td>
-            <td>Query run execution result.</td>
-        </tr>
-    </tbody>
-</table>
+<details>
+    <summary>Endpoint parameters</summary>
+    <table>
+        <thead>
+            <tr>
+                <th>Field name</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td rowspan=1>query_run_id</td>
+                <td>ID of a finished query run.</td>
+            </tr>
+        </tbody>
+    </table>
+</details>
+
+<details>
+    <summary>Response payload</summary>
+    <table>
+        <thead>
+            <tr>
+                <th>Field name</th>
+                <th>Field type</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td rowspan=1>query_run_id</td>
+                <td rowspan=1>string</td>
+                <td>A unique identifier of the executed query.</td>
+            </tr>
+            <tr>
+                <td rowspan=1>version</td>
+                <td rowspan=1>string</td>
+                <td>What ClickHouse version has been used to run the query.</td>
+            </tr>
+            <tr>
+                <td>input</td>
+                <td>string</td>
+                <td>Provided queries.</td>
+            </tr>
+            <tr>
+                <td>output</td>
+                <td>string</td>
+                <td>Query run execution result.</td>
+            </tr>
+        </tbody>
+    </table>
+</details>
 
 Example:
 ```yml
