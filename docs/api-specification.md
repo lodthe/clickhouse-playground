@@ -65,9 +65,8 @@ The base URI is `https://playground.lodthe.me/api`.
 
 ### List available ClickHouse versions
 
-| Endpoint | /tags |
-|----------|-------|
-| Method   | GET   |
+| GET    | /tags |
+|--------|-------|
 
 Get available ClickHouse versions that can be used for running a query.
 Returned versions are just DockerHub image tags.
@@ -231,7 +230,7 @@ You can get information about a previously processed query.
             <tr>
                 <td rowspan=1>query_run_id</td>
                 <td rowspan=1>string</td>
-                <td>A unique identifier of the executed query.</td>
+                <td>ID of the finished query run.</td>
             </tr>
             <tr>
                 <td rowspan=1>version</td>
