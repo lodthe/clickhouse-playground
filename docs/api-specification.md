@@ -207,7 +207,7 @@ You can get information about a previously processed query.
             <td>ID of a finished query run.</td>
         </tr>
         <tr>
-            <td colspan=3 style="text-align: center;">Response payload</td>
+            <td colspan=3><center>Response payload</center></td>
         </tr>
         <tr>
             <td rowspan=1>query_run_id</td>
