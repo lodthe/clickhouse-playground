@@ -9,11 +9,36 @@ networks:
     external: true
 
 services:
+# Uncomment if you want to have a webserver
+#
+#  nginx:
+#    networks:
+#      - playground
+#    image: nginx
+#    ports:
+#      - '80:80'
+#      - '443:443'
+#    volumes:
+#      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+#      - ./data/certbot/conf:/etc/letsencrypt
+#      - ./data/certbot/www:/var/www/certbot
+#    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+#    restart: unless-stopped
+#
+#  certbot:
+#    networks:
+#      - playground
+#    image: certbot/certbot
+#    volumes:
+#      - ./data/certbot/conf:/etc/letsencrypt
+#      - ./data/certbot/www:/var/www/certbot
+#    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+#    restart: unless-stopped
+
   prometheus:
     networks:
       - playground
     image: prom/prometheus
-    restart: always
     volumes:
       - ./prometheus:/etc/prometheus/
       - prometheus_data:/prometheus
@@ -23,11 +48,8 @@ services:
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
     ports:
-      - 9090:9090
-    links:
-      - cadvisor:cadvisor
-    depends_on:
-      - cadvisor
+      - '9090:9090'
+    restart: unless-stopped
 
   cadvisor:
     networks:
@@ -39,10 +61,10 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
     ports:
-      - 8080:8080
-    restart: unless-stopped
+      - '8080:8080'
     deploy:
       mode: global
+    restart: unless-stopped
 
   grafana:
     networks:
@@ -54,54 +76,27 @@ services:
       GF_INSTALL_PLUGINS: 'grafana-clock-panel,grafana-simple-json-datasource'
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning/:/etc/grafana/provisioning/
-      - ./grafana.ini:/etc/grafana/grafana.ini
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
     env_file:
-      - ./grafana/config.monitoring
+      - grafana/.env
     ports:
-      - 3000:3000
-    depends_on:
-      - prometheus
+      - '3000:3000'
 
-  nginx:
-    image: nginx
-    restart: unless-stopped
-    networks:
-      - playground
-    ports:
-      - 80:80
-      - 443:443
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./data/certbot/conf:/etc/letsencrypt
-      - ./data/certbot/www:/var/www/certbot
-    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
-
-  certbot:
-    networks:
-      - playground
-    image: certbot/certbot
-    volumes:
-      - ./data/certbot/conf:/etc/letsencrypt
-      - ./data/certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
-    restart: unless-stopped
+#  webapp:
+#    networks:
+#      - playground
+#    image: lodthe/clickhouse-playground-ui
+#    restart: unless-stopped
 
   playground:
     networks:
       - playground
     image: lodthe/clickhouse-playground
-    ports:
-      - 9000:9000
     environment:
       CONFIG_PATH: /config.yml
     volumes:
-      - /home/lodthe/playground/config.yml:/config.yml
+      - ./config.yml:/config.yml
       - /var/run/docker.sock:/var/run/docker.sock
-    restart: always
-
-  webapp:
-    networks:
-      - playground
-    image: lodthe/clickhouse-playground-ui
-    restart: always
+    ports:
+      - '9000:9000'
+    restart: unless-stopped

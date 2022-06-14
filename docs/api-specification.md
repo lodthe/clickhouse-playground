@@ -2,7 +2,7 @@
 
 Users interact with the platform via the exposed HTTP API.
 
-The project is in the incubating stage, so 
+The project is in the beta stage, so 
 backward compatibility may be broken (in extreme situations).
 
 ## Authorization and authentication
@@ -61,12 +61,12 @@ correctly and the status code is 200.
 
 ---
 
-The base URI is `https://playground.lodthe.me/api`.
+The base URI is `https://playground.lodthe.me/`.
 
 ### List available ClickHouse versions
 
-| GET    | /tags |
-|--------|-------|
+| GET    | /api/tags |
+|--------|-----------|
 
 Get available ClickHouse versions that can be used for running a query.
 Returned versions are just DockerHub image tags.
@@ -111,8 +111,8 @@ curl -XGET https://playground.lodthe.me/api/tags
 
 ### Run a query
 
-| POST   | /runs |
-|--------|-------|
+| POST   | /api/runs |
+|--------|-----------|
 
 The title speaks for itself.  Keep in mind, a new container is created 
 for an incoming request, so it may some time to process the query 
@@ -193,8 +193,8 @@ curl -XPOST https://playground.lodthe.me/api/runs -d '{ \
 ### Get a query execution result
 
 
-| GET    | /runs/{query_run_id} |
-|--------|----------------------|
+| GET    | /api/runs/{query_run_id} |
+|--------|--------------------------|
 
 You can get information about a previously processed query.
 
