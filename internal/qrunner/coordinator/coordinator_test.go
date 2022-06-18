@@ -21,7 +21,7 @@ func TestCoordinator_selectRunner_EqualWeights(t *testing.T) {
 		runners = append(runners, NewRunner(nil, 100))
 	}
 
-	c := New(context.Background(), zlog.Logger, runners)
+	c := New(context.Background(), zlog.Logger, runners, Config{HealthChecksEnabled: false})
 
 	timesSelected := make(map[*Runner]uint, len(runners))
 	for i := 0; i < samples; i++ {
@@ -52,7 +52,7 @@ func TestCoordinator_selectRunner_DifferentWeights(t *testing.T) {
 		totalWeight += float64(r.weight)
 	}
 
-	c := New(context.Background(), zlog.Logger, runners)
+	c := New(context.Background(), zlog.Logger, runners, Config{HealthChecksEnabled: false})
 
 	timesSelected := make(map[*Runner]uint, len(runners))
 	for i := 0; i < samples; i++ {

@@ -32,11 +32,6 @@ func newProvider(ctx context.Context, daemonURL *string) (*engineProvider, error
 		return nil, errors.Wrap(err, "failed to create Docker client")
 	}
 
-	_, err = cli.Ping(ctx)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to ping the docker daemon")
-	}
-
 	return &engineProvider{
 		mainCtx: ctx,
 		cli:     cli,
@@ -74,6 +69,12 @@ func getDockerEngineOpts(daemonURL *string) ([]dockercli.Opt, error) {
 	)
 
 	return opts, nil
+}
+
+func (p *engineProvider) ping(ctx context.Context) error {
+	_, err := p.cli.Ping(ctx)
+
+	return err
 }
 
 func (p *engineProvider) ownershipLabelFilter() (key, value string) {

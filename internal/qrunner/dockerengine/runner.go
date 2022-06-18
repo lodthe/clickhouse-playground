@@ -81,6 +81,15 @@ func (r *Runner) Name() string {
 	return r.name
 }
 
+func (r *Runner) Status(ctx context.Context) qrunner.RunnerStatus {
+	err := r.engine.ping(ctx)
+
+	return qrunner.RunnerStatus{
+		Alive:            err == nil,
+		LivenessProbeErr: err,
+	}
+}
+
 // Start runs the following background tasks:
 // 1) gc -- prunes containers and images;
 // 2) status exporter -- exports information about current state of the runner.

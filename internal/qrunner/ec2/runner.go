@@ -54,6 +54,12 @@ func (r *Runner) Name() string {
 	return r.name
 }
 
+func (r *Runner) Status(_ context.Context) qrunner.RunnerStatus {
+	return qrunner.RunnerStatus{
+		Alive: true,
+	}
+}
+
 func (r *Runner) Start() error {
 	r.logger.Info().Msg("Start is not implemented for the ec2 runner")
 

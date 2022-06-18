@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
+
+const DefaultLivenessCheckTimeout = 5 * time.Second
 
 // Coordinator is a runner that does load balancing among other runners.
 // It keeps list of existing runners and dispatches incoming queries to one of them.
@@ -21,6 +24,9 @@ type Coordinator struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	config             Config
+	livenessCheckLoops sync.WaitGroup
+
 	logger  zerolog.Logger
 	started int32
 
@@ -29,7 +35,7 @@ type Coordinator struct {
 	runners []*Runner
 }
 
-func New(ctx context.Context, logger zerolog.Logger, runners []*Runner) *Coordinator {
+func New(ctx context.Context, logger zerolog.Logger, runners []*Runner, cfg Config) *Coordinator {
 	ctx, cancel := context.WithCancel(ctx)
 
 	// It's okay to initialize by setting time, because it's just for load balancing among runners.
@@ -37,9 +43,10 @@ func New(ctx context.Context, logger zerolog.Logger, runners []*Runner) *Coordin
 
 	return &Coordinator{
 		ctx:     ctx,
+		cancel:  cancel,
+		config:  cfg,
 		logger:  logger.With().Str("runner", "coordinator").Logger(),
 		random:  random,
-		cancel:  cancel,
 		runners: runners,
 	}
 }
@@ -52,7 +59,7 @@ func (c *Coordinator) Name() string {
 	return "coordinator"
 }
 
-// Start starts underlying runners.
+// Start starts underlying runners and starts liveness probe processes.
 func (c *Coordinator) Start() error {
 	if !atomic.CompareAndSwapInt32(&c.started, 0, 1) {
 		return errors.New("coordinator has already been started")
@@ -74,6 +81,11 @@ func (c *Coordinator) Start() error {
 		}
 
 		count++
+
+		if c.config.HealthChecksEnabled {
+			c.livenessCheckLoops.Add(1)
+			go c.loopCheckLiveness(r)
+		}
 	}
 
 	if totalWeight == 0 {
@@ -83,6 +95,52 @@ func (c *Coordinator) Start() error {
 	c.logger.Info().Uint("count", count).Msg("underlying runners have been started")
 
 	return nil
+}
+
+func (c *Coordinator) loopCheckLiveness(r *Runner) {
+	defer c.livenessCheckLoops.Done()
+
+	rlogger := c.logger.With().Str("underlying_runner", r.underlying.Name()).Logger()
+	rlogger.Debug().Dur("retry_delay_ms", c.config.HealthCheckRetryDelay).Msg("liveness loop has been started")
+
+	checkLiveness := func() {
+		withTimeout, cancel := context.WithTimeout(c.ctx, DefaultLivenessCheckTimeout)
+		defer cancel()
+
+		status := r.underlying.Status(withTimeout)
+
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+		}
+
+		if status.Alive {
+			r.setAlive(true)
+			return
+		}
+
+		r.setAlive(false)
+
+		rlogger.Debug().Err(status.LivenessProbeErr).Msg("runner is not responding")
+	}
+
+	checkLiveness()
+
+	t := time.NewTicker(c.config.HealthCheckRetryDelay)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-c.ctx.Done():
+			rlogger.Debug().Msg("liveness loop has been stopped")
+			return
+
+		case <-t.C:
+		}
+
+		checkLiveness()
+	}
 }
 
 func (c *Coordinator) Stop() error {
