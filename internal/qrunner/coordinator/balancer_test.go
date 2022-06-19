@@ -2,30 +2,36 @@ package coordinator
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"testing"
 
-	zlog "github.com/rs/zerolog/log"
+	"clickhouse-playground/internal/qrunner/stubrunner"
+
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCoordinator_selectRunner_EqualWeights(t *testing.T) {
+func TestBalancer_selectRunner_EqualWeights(t *testing.T) {
 	const runnerCount = 5
 	const samples = 10000
 	const maxDeviation = 0.1
 	const expected = samples / runnerCount
 	// Each runner should be selected samples / runnerCount times roughly.
 
+	ctx := context.Background()
+	b := newBalancer()
+
 	var runners []*Runner
 	for i := 0; i < runnerCount; i++ {
-		runners = append(runners, NewRunner(nil, 100))
-	}
+		r := NewRunner(stubrunner.New(ctx, fmt.Sprintf("r%d", i), stubrunner.StubRun), 100)
 
-	c := New(context.Background(), zlog.Logger, runners, Config{HealthChecksEnabled: false})
+		assert.True(t, b.add(r))
+		runners = append(runners, r)
+	}
 
 	timesSelected := make(map[*Runner]uint, len(runners))
 	for i := 0; i < samples; i++ {
-		r := c.selectRunner()
+		r := b.selectRunner()
 		timesSelected[r] = timesSelected[r] + 1
 	}
 
@@ -37,7 +43,7 @@ func TestCoordinator_selectRunner_EqualWeights(t *testing.T) {
 	}
 }
 
-func TestCoordinator_selectRunner_DifferentWeights(t *testing.T) {
+func TestBalancer_selectRunner_DifferentWeights(t *testing.T) {
 	const runnerCount = 5
 	const samples = 20000
 	const maxDeviation = 0.2
@@ -45,18 +51,20 @@ func TestCoordinator_selectRunner_DifferentWeights(t *testing.T) {
 	var runners []*Runner
 	var totalWeight float64
 
+	ctx := context.Background()
+	b := newBalancer()
+
 	// The weight of the i-th runner is (i + 1) * 100.
 	for i := 0; i < runnerCount; i++ {
-		r := NewRunner(nil, 100*uint(i+1))
+		r := NewRunner(stubrunner.New(ctx, fmt.Sprintf("r%d", i), stubrunner.StubRun), 100*uint(i+1))
 		runners = append(runners, r)
+		assert.True(t, b.add(r))
 		totalWeight += float64(r.weight)
 	}
 
-	c := New(context.Background(), zlog.Logger, runners, Config{HealthChecksEnabled: false})
-
 	timesSelected := make(map[*Runner]uint, len(runners))
 	for i := 0; i < samples; i++ {
-		r := c.selectRunner()
+		r := b.selectRunner()
 		timesSelected[r] = timesSelected[r] + 1
 	}
 

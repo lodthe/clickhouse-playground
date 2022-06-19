@@ -2,7 +2,6 @@ package coordinator
 
 import (
 	"context"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,6 +11,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
+
+var ErrNoAvailableRunner = errors.New("no available runners, try again later")
 
 const DefaultLivenessCheckTimeout = 5 * time.Second
 
@@ -30,24 +31,20 @@ type Coordinator struct {
 	logger  zerolog.Logger
 	started int32
 
-	random *rand.Rand
-
-	runners []*Runner
+	runners  []*Runner
+	balancer *balancer
 }
 
 func New(ctx context.Context, logger zerolog.Logger, runners []*Runner, cfg Config) *Coordinator {
 	ctx, cancel := context.WithCancel(ctx)
 
-	// It's okay to initialize by setting time, because it's just for load balancing among runners.
-	random := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint:gosec
-
 	return &Coordinator{
-		ctx:     ctx,
-		cancel:  cancel,
-		config:  cfg,
-		logger:  logger.With().Str("runner", "coordinator").Logger(),
-		random:  random,
-		runners: runners,
+		ctx:      ctx,
+		cancel:   cancel,
+		config:   cfg,
+		logger:   logger.With().Str("runner", "coordinator").Logger(),
+		runners:  runners,
+		balancer: newBalancer(),
 	}
 }
 
@@ -97,6 +94,9 @@ func (c *Coordinator) Start() error {
 	return nil
 }
 
+// loopCheckLiveness periodically sends liveness probes to the provided runner.
+// If the runner does not respond, it's marked as dead and excluded from load balancing.
+// When the runner passes a liveness probe, it's included in load balancing.
 func (c *Coordinator) loopCheckLiveness(r *Runner) {
 	defer c.livenessCheckLoops.Done()
 
@@ -117,10 +117,13 @@ func (c *Coordinator) loopCheckLiveness(r *Runner) {
 
 		if status.Alive {
 			r.setAlive(true)
+			c.balancer.add(r)
+
 			return
 		}
 
 		r.setAlive(false)
+		c.balancer.remove(r)
 
 		rlogger.Debug().Err(status.LivenessProbeErr).Msg("runner is not responding")
 	}
@@ -143,6 +146,7 @@ func (c *Coordinator) loopCheckLiveness(r *Runner) {
 	}
 }
 
+// Stop stops underlying runners and waits for the health checks to be finished.
 func (c *Coordinator) Stop() error {
 	c.cancel()
 
@@ -159,41 +163,23 @@ func (c *Coordinator) Stop() error {
 		}
 	}
 
+	c.logger.Info().Msg("runners have been stopped")
+
+	c.livenessCheckLoops.Wait()
+
 	c.logger.Info().Msg("coordinator has been stopped")
 
 	return nil
 }
 
 // RunQuery proxies queries to one of the underlying runners.
-func (c *Coordinator) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
-	r := c.selectRunner()
-	if r == nil {
-		return "", errors.New("no alive runners")
+func (c *Coordinator) RunQuery(ctx context.Context, runID string, query string, version string) (output string, err error) {
+	processed := c.balancer.processJob(func(r *Runner) {
+		output, err = r.underlying.RunQuery(ctx, runID, query, version)
+	})
+	if !processed {
+		return "", ErrNoAvailableRunner
 	}
 
-	return r.underlying.RunQuery(ctx, runID, query, version)
-}
-
-// selectRunner selects a random runner (weight is considered).
-// If the weight of r1 is 10 times the weight of r2, r1 is selected 10 times more often.
-func (c *Coordinator) selectRunner() *Runner {
-	var totalWeight uint64
-	for _, r := range c.runners {
-		totalWeight += uint64(r.weight)
-	}
-
-	if totalWeight == 0 {
-		return nil
-	}
-
-	rnd := c.random.Uint64() % totalWeight
-	for _, r := range c.runners {
-		if rnd < uint64(r.weight) {
-			return r
-		}
-
-		rnd -= uint64(r.weight)
-	}
-
-	return nil
+	return output, err
 }

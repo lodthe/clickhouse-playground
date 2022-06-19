@@ -84,7 +84,7 @@ func main() {
 	go func() {
 		err := coord.Start()
 		if err != nil {
-			zlog.Fatal().Err(err).Msg("runner cannot be started")
+			zlog.Fatal().Err(err).Msg("coordinator cannot be started")
 		}
 	}()
 
