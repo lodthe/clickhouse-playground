@@ -45,6 +45,12 @@ aws:
   # DynamoDB table name used to store completed query runs.
   query_runs_table: QueryRuns
 
+coordinator:
+  # [OPTIONAL] The coordinator sends liveness probes to runners. If a runner does not respond, it's excluded
+  # from load balancing temporarily. This field configures delay between two probes.
+  # Default: 10 seconds.
+  health_check_retry_delay: 10s
+
 runners:
   # You can specify several runners. The coordinator will load balance incoming queries among them.
   - # Available types: EC2, DOCKER_ENGINE.

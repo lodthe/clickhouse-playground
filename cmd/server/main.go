@@ -75,11 +75,16 @@ func main() {
 
 	// Create runners and the coordinator.
 	runners := initializeRunners(ctx, config, awsConfig, tagStorage, logger)
-	coord := coordinator.New(ctx, logger, runners)
+
+	coordinatorCfg := coordinator.Config{
+		HealthChecksEnabled:   true,
+		HealthCheckRetryDelay: config.Coordinator.HealthCheckRetryDelay,
+	}
+	coord := coordinator.New(ctx, logger, runners, coordinatorCfg)
 	go func() {
 		err := coord.Start()
 		if err != nil {
-			zlog.Fatal().Err(err).Msg("runner cannot be started")
+			zlog.Fatal().Err(err).Msg("coordinator cannot be started")
 		}
 	}()
 

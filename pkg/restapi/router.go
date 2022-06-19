@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"clickhouse-playground/internal/metrics"
-	"clickhouse-playground/internal/qrunner"
 	"clickhouse-playground/internal/queryrun"
 
 	"github.com/go-chi/chi/v5"
@@ -19,7 +18,7 @@ type RouterOpts struct {
 	DockerRepository string
 }
 
-func NewRouter(timeout time.Duration, runner qrunner.Runner, tagStorage TagStorage, runRepo queryrun.Repository, maxQueryLength, maxOutputLength uint64) http.Handler {
+func NewRouter(timeout time.Duration, runner QueryRunner, tagStorage TagStorage, runRepo queryrun.Repository, maxQueryLength, maxOutputLength uint64) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(metricsMiddleware)

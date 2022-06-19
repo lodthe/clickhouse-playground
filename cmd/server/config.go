@@ -41,7 +41,8 @@ type Config struct {
 
 	AWS AWS `mapstructure:"aws"`
 
-	Runners []Runner `mapstructure:"runners"`
+	Coordinator Coordinator `mapstructure:"coordinator"`
+	Runners     []Runner    `mapstructure:"runners"`
 }
 
 type Limits struct {
@@ -67,6 +68,10 @@ type AWS struct {
 	Region          string `mapstructure:"region"`
 
 	QueryRunsTableName string `mapstructure:"query_runs_table"`
+}
+
+type Coordinator struct {
+	HealthCheckRetryDelay time.Duration `mapstructure:"health_check_retry_delay"`
 }
 
 type Runner struct {
@@ -230,6 +235,10 @@ func (c *Config) validate() error {
 	}
 	if c.AWS.QueryRunsTableName == "" {
 		return errors.New("aws.query_runs_table is required")
+	}
+
+	if c.Coordinator.HealthCheckRetryDelay == 0 {
+		c.Coordinator.HealthCheckRetryDelay = coordinator.DefaultHealthCheckRetryDelay
 	}
 
 	if len(c.Runners) == 0 {

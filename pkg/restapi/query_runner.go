@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"clickhouse-playground/internal/qrunner"
 	"clickhouse-playground/internal/queryrun"
 
 	"github.com/go-chi/chi/v5"
@@ -15,7 +14,7 @@ import (
 )
 
 type queryHandler struct {
-	r       qrunner.Runner
+	r       QueryRunner
 	runRepo queryrun.Repository
 
 	tagStorage TagStorage
@@ -24,7 +23,7 @@ type queryHandler struct {
 	maxOutputLength uint64
 }
 
-func newQueryHandler(r qrunner.Runner, runRepo queryrun.Repository, storage TagStorage, maxQueryLength, maxOutputLength uint64) *queryHandler {
+func newQueryHandler(r QueryRunner, runRepo queryrun.Repository, storage TagStorage, maxQueryLength, maxOutputLength uint64) *queryHandler {
 	return &queryHandler{
 		r:               r,
 		runRepo:         runRepo,
