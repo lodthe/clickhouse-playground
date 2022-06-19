@@ -12,8 +12,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var ErrNoAvailableRunner = errors.New("no available runners, try again later")
-
 const DefaultLivenessCheckTimeout = 5 * time.Second
 
 // Coordinator is a runner that does load balancing among other runners.
@@ -178,7 +176,7 @@ func (c *Coordinator) RunQuery(ctx context.Context, runID string, query string, 
 		output, err = r.underlying.RunQuery(ctx, runID, query, version)
 	})
 	if !processed {
-		return "", ErrNoAvailableRunner
+		return "", qrunner.ErrNoAvailableRunners
 	}
 
 	return output, err

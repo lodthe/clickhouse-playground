@@ -75,9 +75,10 @@ type Coordinator struct {
 }
 
 type Runner struct {
-	Type   RunnerType `mapstructure:"type"`
-	Name   string     `mapstructure:"name"`
-	Weight uint       `mapstructure:"weight"`
+	Type           RunnerType `mapstructure:"type"`
+	Name           string     `mapstructure:"name"`
+	Weight         uint       `mapstructure:"weight"`
+	MaxConcurrency *uint32    `mapstructure:"max_concurrency"`
 
 	EC2          *EC2          `mapstructure:"ec2"`
 	DockerEngine *DockerEngine `mapstructure:"docker_engine"`
@@ -119,6 +120,10 @@ func (r *Runner) Validate() error {
 	if r.Weight == 0 {
 		r.Weight = coordinator.DefaultWeight
 		zlog.Debug().Str("runner", r.Name).Int("new_value", coordinator.DefaultWeight).Msg("weight has been set")
+	}
+
+	if r.MaxConcurrency != nil && *r.MaxConcurrency < 1 {
+		return errors.Errorf("max_concurrency must be > 0, but %d has been found", *r.MaxConcurrency)
 	}
 
 	switch r.Type {

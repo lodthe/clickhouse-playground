@@ -57,6 +57,10 @@ runners:
     type: DOCKER_ENGINE
     name: default
 
+    # [OPTIONAL] You can limit max number of concurrently processing requests on a runner.
+    # Default: unlimited (the field is missed).
+    max_concurrency: 10
+
     # You can specify the integer weight of the runner for load balancing.
     # If the weight of r1 is 10 times the weight of r2, r1 is selected 10 times more often.
     # Default: 100.
