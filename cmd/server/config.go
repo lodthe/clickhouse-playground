@@ -245,11 +245,19 @@ func (c *Config) validate() error {
 		return errors.New("empty runner list")
 	}
 
+	uniqueRunners := make(map[string]struct{}, len(c.Runners))
 	for i := range c.Runners {
 		err := c.Runners[i].Validate()
 		if err != nil {
 			return errors.Wrap(err, "runner validation")
 		}
+
+		_, exists := uniqueRunners[c.Runners[i].Name]
+		if exists {
+			return errors.Errorf("runner names must be unique, but '%s' is not unique", c.Runners[i].Name)
+		}
+
+		uniqueRunners[c.Runners[i].Name] = struct{}{}
 	}
 
 	return nil

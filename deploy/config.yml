@@ -45,8 +45,11 @@ aws:
   # DynamoDB table name used to store completed query runs.
   query_runs_table: QueryRuns
 
-# [OPTIONAL] Absolute path to the custom config used on clickhouse-server startup.
-# custom_config_path: /fast-startup-config.xml
+coordinator:
+  # [OPTIONAL] The coordinator sends liveness probes to runners. If a runner does not respond, it's excluded
+  # from load balancing temporarily. This field configures delay between two probes.
+  # Default: 10 seconds.
+  health_check_retry_delay: 10s
 
 runners:
   # You can specify several runners. The coordinator will load balance incoming queries among them.
@@ -91,6 +94,16 @@ runners:
       #
       # Default: local "unix:///var/run/docker.sock" is used.
       # daemon_url: ssh://clickhouse-playground
+
+      # [OPTIONAL] Absolute path to the custom config used on clickhouse-server startup.
+      # Refer to ./custom-configs/fast-startup-config.xml for examples.
+      # Default: no custom config is used.
+      # custom_config_path: /fast-startup-config.xml
+
+      # [OPTIONAL] Absolute path to the quotas config.
+      # Refer to ./custom-configs/quotas.xml for examples.
+      # Default: no quotas are set.
+      # quotas_path: /quotas.xml
 
       # You can configure the garbage collector to prune hanged up containers and images.
       # If the field is missed, gc is disabled.
