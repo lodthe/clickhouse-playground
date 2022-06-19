@@ -8,6 +8,7 @@ import (
 
 	"clickhouse-playground/internal/qrunner/stubrunner"
 
+	zlog "github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +20,7 @@ func TestBalancer_selectRunner_EqualWeights(t *testing.T) {
 	// Each runner should be selected samples / runnerCount times roughly.
 
 	ctx := context.Background()
-	b := newBalancer()
+	b := newBalancer(zlog.Logger)
 
 	var runners []*Runner
 	for i := 0; i < runnerCount; i++ {
@@ -52,7 +53,7 @@ func TestBalancer_selectRunner_DifferentWeights(t *testing.T) {
 	var totalWeight float64
 
 	ctx := context.Background()
-	b := newBalancer()
+	b := newBalancer(zlog.Logger)
 
 	// The weight of the i-th runner is (i + 1) * 100.
 	for i := 0; i < runnerCount; i++ {

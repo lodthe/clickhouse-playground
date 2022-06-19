@@ -4,20 +4,25 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 type balancer struct {
+	logger zerolog.Logger
+
 	lock    sync.RWMutex
 	runners map[string]*Runner
 
 	random *rand.Rand
 }
 
-func newBalancer() *balancer {
+func newBalancer(logger zerolog.Logger) *balancer {
 	// It's okay to initialize by setting time, because it's just for load balancing among runners.
 	random := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint:gosec
 
 	return &balancer{
+		logger:  logger,
 		runners: make(map[string]*Runner),
 		random:  random,
 	}
@@ -36,6 +41,8 @@ func (b *balancer) add(r *Runner) bool {
 
 	b.runners[r.underlying.Name()] = r
 
+	b.logger.Info().Str("name", r.underlying.Name()).Msg("runner has been included in load balancing")
+
 	return true
 }
 
@@ -44,7 +51,14 @@ func (b *balancer) remove(r *Runner) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
+	_, found := b.runners[r.underlying.Name()]
+	if !found {
+		return
+	}
+
 	delete(b.runners, r.underlying.Name())
+
+	b.logger.Info().Str("name", r.underlying.Name()).Msg("runner has been excluded from load balancing")
 }
 
 type runnerJob = func(r *Runner)

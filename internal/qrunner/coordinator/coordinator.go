@@ -44,7 +44,7 @@ func New(ctx context.Context, logger zerolog.Logger, runners []*Runner, cfg Conf
 		config:   cfg,
 		logger:   logger.With().Str("runner", "coordinator").Logger(),
 		runners:  runners,
-		balancer: newBalancer(),
+		balancer: newBalancer(logger),
 	}
 }
 
