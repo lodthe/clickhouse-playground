@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"clickhouse-playground/internal/qrunner"
 	"clickhouse-playground/internal/queryrun"
 
 	"github.com/go-chi/chi/v5"
@@ -79,7 +80,14 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 	output, err := h.r.RunQuery(r.Context(), run.ID, req.Query, req.Version)
 	if err != nil {
 		zlog.Error().Err(err).Interface("request", req).Msg("query run failed")
-		writeError(w, "internal error", http.StatusInternalServerError)
+
+		switch {
+		case errors.Is(err, qrunner.ErrNoAvailableRunners):
+			writeError(w, err.Error(), http.StatusTooManyRequests)
+
+		default:
+			writeError(w, "internal error", http.StatusInternalServerError)
+		}
 
 		return
 	}

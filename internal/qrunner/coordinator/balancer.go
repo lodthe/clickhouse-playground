@@ -11,7 +11,7 @@ import (
 type balancer struct {
 	logger zerolog.Logger
 
-	lock    sync.RWMutex
+	lock    sync.Mutex
 	runners map[string]*Runner
 
 	random *rand.Rand
@@ -51,6 +51,10 @@ func (b *balancer) remove(r *Runner) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
+	b.removeUnderLock(r)
+}
+
+func (b *balancer) removeUnderLock(r *Runner) {
 	_, found := b.runners[r.underlying.Name()]
 	if !found {
 		return
@@ -67,9 +71,32 @@ type runnerJob = func(r *Runner)
 // It returns true if a runner has been found.
 // There are no available runners when all of them are dead or have concurrency limit exhausted.
 func (b *balancer) processJob(job runnerJob) bool {
-	runner := b.selectRunner()
+	var runner *Runner
+	var excluded bool
+	func() {
+		b.lock.Lock()
+		defer b.lock.Unlock()
+
+		runner = b.selectRunner()
+		if runner == nil {
+			return
+		}
+
+		// Check if concurrency limit has not been exhausted.
+		concurrency := runner.addConcurrency(1)
+		if runner.maxConcurrency != nil && concurrency >= *runner.maxConcurrency {
+			b.removeUnderLock(runner)
+			excluded = true
+		}
+	}()
+
 	if runner == nil {
 		return false
+	}
+
+	defer runner.addConcurrency(-1)
+	if excluded {
+		defer b.add(runner)
 	}
 
 	job(runner)
@@ -79,10 +106,9 @@ func (b *balancer) processJob(job runnerJob) bool {
 
 // selectRunner implements a weighted random choice algorithm and returns a runner.
 // If the weight of r1 is 10 times the weight of r2, r1 is selected ~10 times more often.
+//
+// selectRunner must be called under the taken lock.
 func (b *balancer) selectRunner() *Runner {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
 	var totalWeight uint64
 	for _, r := range b.runners {
 		totalWeight += uint64(r.weight)

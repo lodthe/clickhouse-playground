@@ -177,7 +177,7 @@ func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config
 			zlog.Fatal().Msg("invalid runner")
 		}
 
-		runners = append(runners, coordinator.NewRunner(runner, r.Weight))
+		runners = append(runners, coordinator.NewRunner(runner, r.Weight, r.MaxConcurrency))
 	}
 
 	return runners

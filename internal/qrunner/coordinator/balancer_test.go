@@ -24,7 +24,7 @@ func TestBalancer_selectRunner_EqualWeights(t *testing.T) {
 
 	var runners []*Runner
 	for i := 0; i < runnerCount; i++ {
-		r := NewRunner(stubrunner.New(ctx, fmt.Sprintf("r%d", i), stubrunner.StubRun), 100)
+		r := NewRunner(stubrunner.New(ctx, fmt.Sprintf("r%d", i), stubrunner.StubRun), 100, nil)
 
 		assert.True(t, b.add(r))
 		runners = append(runners, r)
@@ -57,7 +57,7 @@ func TestBalancer_selectRunner_DifferentWeights(t *testing.T) {
 
 	// The weight of the i-th runner is (i + 1) * 100.
 	for i := 0; i < runnerCount; i++ {
-		r := NewRunner(stubrunner.New(ctx, fmt.Sprintf("r%d", i), stubrunner.StubRun), 100*uint(i+1))
+		r := NewRunner(stubrunner.New(ctx, fmt.Sprintf("r%d", i), stubrunner.StubRun), 100*uint(i+1), nil)
 		runners = append(runners, r)
 		assert.True(t, b.add(r))
 		totalWeight += float64(r.weight)
