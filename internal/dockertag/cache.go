@@ -24,18 +24,18 @@ type Cache struct {
 
 	updating int32
 
-	mu            sync.RWMutex
-	updatedAt     time.Time
-	tags          map[string]ImageTag
-	tagsFlattened []ImageTag
+	mu         sync.RWMutex
+	updatedAt  time.Time
+	imageByTag map[string]Image
+	images     []Image
 }
 
 func NewCache(ctx context.Context, config Config, cli DockerHubClient) *Cache {
 	return &Cache{
-		ctx:    ctx,
-		config: config,
-		cli:    cli,
-		tags:   make(map[string]ImageTag),
+		ctx:        ctx,
+		config:     config,
+		cli:        cli,
+		imageByTag: make(map[string]Image),
 	}
 }
 
@@ -76,13 +76,13 @@ func (c *Cache) normalizeTag(tag string) string {
 }
 
 // GetAll returns all known tags for the given image.
-func (c *Cache) GetAll() []ImageTag {
+func (c *Cache) GetAll() []Image {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	c.updateIfExpired()
 
-	return c.tagsFlattened
+	return c.images
 }
 
 // Exists checks whether the image has the given tag.
@@ -90,26 +90,23 @@ func (c *Cache) Exists(tag string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	_, found := c.tags[c.normalizeTag(tag)]
+	_, found := c.imageByTag[c.normalizeTag(tag)]
 
 	c.updateIfExpired()
 
 	return found
 }
 
-// Get returns the image tag if it exists. Otherwise, nil is returned.
-func (c *Cache) Get(tag string) *ImageTag {
+// Find searches an image by its tag.
+func (c *Cache) Find(tag string) (img Image, found bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	t, found := c.tags[c.normalizeTag(tag)]
-	if !found {
-		return nil
-	}
+	defer c.updateIfExpired()
 
-	c.updateIfExpired()
+	img, found = c.imageByTag[c.normalizeTag(tag)]
 
-	return &t
+	return img, found
 }
 
 // updateIfExpired asynchronously updates cache if the cache has expired.
@@ -137,32 +134,32 @@ func (c *Cache) asyncUpdate() {
 
 	startedAt := time.Now()
 
-	tags, err := c.cli.GetTags(c.config.Image)
+	tags, err := c.cli.GetTags(c.config.Image.Repository)
 	if err != nil {
-		zlog.Error().Err(err).Str("image", c.config.Image).Msg("failed to get docker images")
+		zlog.Error().Err(err).Str("image", c.config.Image.Repository).Msg("failed to get docker images")
 		return
 	}
 
-	var tagsFlattened []ImageTag
-	tagsByName := make(map[string]ImageTag)
+	var flattened []Image
+	imgByTag := make(map[string]Image)
 
 	for _, t := range tags {
 		for _, i := range t.Images {
-			if !strings.EqualFold(i.OS, c.config.OS) || !strings.EqualFold(i.Architecture, c.config.Architecture) {
+			if !strings.EqualFold(i.OS, c.config.Image.OS) || !strings.EqualFold(i.Architecture, c.config.Image.Architecture) {
 				continue
 			}
 
-			converted := ImageTag{
-				ImageName:    c.config.Image,
-				TagName:      t.Name,
+			converted := Image{
+				Repository:   c.config.Image.Repository,
+				Tag:          t.Name,
 				OS:           i.OS,
 				Architecture: i.Architecture,
 				Digest:       i.Digest,
 				PushedAt:     i.LastPushed,
 			}
 
-			tagsByName[c.normalizeTag(converted.TagName)] = converted
-			tagsFlattened = append(tagsFlattened, converted)
+			imgByTag[c.normalizeTag(converted.Tag)] = converted
+			flattened = append(flattened, converted)
 		}
 	}
 
@@ -171,9 +168,9 @@ func (c *Cache) asyncUpdate() {
 		defer c.mu.Unlock()
 
 		c.updatedAt = time.Now()
-		c.tags = tagsByName
-		c.tagsFlattened = tagsFlattened
+		c.imageByTag = imgByTag
+		c.images = flattened
 	}()
 
-	zlog.Debug().Dur("elapsed", time.Since(startedAt)).Int("tag_count", len(tagsByName)).Msg("docker image tag cache has been updated")
+	zlog.Debug().Dur("elapsed", time.Since(startedAt)).Int("tag_count", len(imgByTag)).Msg("docker image tag cache has been updated")
 }

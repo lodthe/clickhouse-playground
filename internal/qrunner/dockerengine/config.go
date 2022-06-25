@@ -5,8 +5,6 @@ import "time"
 type Config struct {
 	DaemonURL *string
 
-	Repository string
-
 	ExecRetryDelay time.Duration
 	MaxExecRetries int
 
@@ -51,8 +49,6 @@ var defaultImageGCCountThreshold = uint(60)
 var defaultImageBufferSize = uint(30)
 
 var DefaultConfig = Config{
-	Repository: "clickhouse/clickhouse-server",
-
 	ExecRetryDelay: 200 * time.Millisecond,
 	MaxExecRetries: 20,
 

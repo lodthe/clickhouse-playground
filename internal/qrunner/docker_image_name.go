@@ -13,6 +13,6 @@ func PlaygroundImageName(repository, digest string) string {
 	return fmt.Sprintf("chp-%s:%s", repository, strings.TrimPrefix(digest, "sha256:"))
 }
 
-func IsPlaygroundImageName(name string, repository string) bool {
-	return strings.HasPrefix(name, "chp-"+repository)
+func IsPlaygroundImageName(name string) bool {
+	return strings.HasPrefix(name, "chp-")
 }

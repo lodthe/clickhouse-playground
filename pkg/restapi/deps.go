@@ -7,7 +7,7 @@ import (
 )
 
 type TagStorage interface {
-	GetAll() []dockertag.ImageTag
+	GetAll() []dockertag.Image
 	Exists(tag string) bool
 }
 

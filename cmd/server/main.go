@@ -66,9 +66,11 @@ func main() {
 	dynamodbClient := dynamodb.NewFromConfig(awsConfig)
 	dockerhubCli := dockerhub.NewClient(dockerhub.DockerHubURL, dockerhub.DefaultMaxRPS)
 	tagStorage := dockertag.NewCache(ctx, dockertag.Config{
-		Image:          config.DockerImage.Name,
-		OS:             config.DockerImage.OS,
-		Architecture:   config.DockerImage.Architecture,
+		Image: dockertag.ImageConfig{
+			Repository:   config.DockerImage.Repository,
+			OS:           config.DockerImage.OS,
+			Architecture: config.DockerImage.Architecture,
+		},
 		ExpirationTime: config.DockerImage.CacheExpirationTime,
 	}, dockerhubCli)
 	tagStorage.RunBackgroundUpdate()
@@ -148,7 +150,6 @@ func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config
 			rcfg.DaemonURL = r.DockerEngine.DaemonURL
 			rcfg.CustomConfigPath = r.DockerEngine.CustomConfigPath
 			rcfg.QuotasPath = r.DockerEngine.QuotasPath
-			rcfg.Repository = config.DockerImage.Name
 			rcfg.GC = nil
 
 			gc := r.DockerEngine.GC

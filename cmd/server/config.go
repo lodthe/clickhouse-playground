@@ -51,7 +51,7 @@ type Limits struct {
 }
 
 type DockerImage struct {
-	Name                string        `mapstructure:"image"`
+	Repository          string        `mapstructure:"repository"`
 	OS                  string        `mapstructure:"os"`
 	Architecture        string        `mapstructure:"architecture"`
 	CacheExpirationTime time.Duration `mapstructure:"image_tags_cache_expiration_time"`
@@ -204,8 +204,8 @@ func (c *Config) validate() error {
 		c.LogLevel = "debug"
 	}
 
-	if c.DockerImage.Name == "" {
-		return errors.New("docker_image.name is required")
+	if c.DockerImage.Repository == "" {
+		return errors.New("docker_image.repository is required")
 	}
 	if c.DockerImage.OS == "" {
 		return errors.New("docker_image.os is required")

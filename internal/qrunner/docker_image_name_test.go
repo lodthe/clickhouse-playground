@@ -46,6 +46,6 @@ func TestIsPlaygroundImageName(t *testing.T) {
 	chp := PlaygroundImageName("clickhouse/clickhouse-playground", "sha256:f321ba3999901412bc2616216a631f")
 	notChp := "clickhouse/clickhouse-playground:21.2.2"
 
-	assert.True(t, IsPlaygroundImageName(chp, "clickhouse/clickhouse-playground"))
-	assert.False(t, IsPlaygroundImageName(notChp, "clickhouse/clickhouse-playground"))
+	assert.True(t, IsPlaygroundImageName(chp))
+	assert.False(t, IsPlaygroundImageName(notChp))
 }

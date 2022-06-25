@@ -29,7 +29,7 @@ func (h *imageTagHandler) getImageTags(w http.ResponseWriter, r *http.Request) {
 
 	names := make([]string, 0, len(tags))
 	for _, t := range tags {
-		names = append(names, t.TagName)
+		names = append(names, t.Tag)
 	}
 
 	writeResult(w, GetImageTagsOutput{Tags: names})
