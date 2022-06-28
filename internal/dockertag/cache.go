@@ -16,7 +16,7 @@ import (
 )
 
 type DockerHubClient interface {
-	GetTags(image string) ([]dockerhub.ImageTag, error)
+	GetTags(repository string) ([]dockerhub.ImageTag, error)
 }
 
 // Cache is a cache for the list of docker image's tags.
@@ -130,9 +130,6 @@ func (c *Cache) updateIfExpired() {
 }
 
 // asyncUpdate fetches actual image list and updates the cache.
-// It spawns a goroutine for each repository that collects images from it.
-// Then it merges all the lists of images. If there are several occurrences of an image tag in two repositories,
-// the data is taken from the first repository
 //
 // The updating atomic is used to prevent simultaneous updates.
 func (c *Cache) asyncUpdate() {
@@ -143,13 +140,38 @@ func (c *Cache) asyncUpdate() {
 
 	startedAt := time.Now()
 
+	images, imgByTag, err := c.getImagesFromSeveralRepositories(c.config.Repositories)
+	if err != nil {
+		return
+	}
+
+	func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		c.updatedAt = time.Now()
+		c.images = images
+		c.imageByTag = imgByTag
+	}()
+
+	c.logger.Debug().Dur("elapsed", time.Since(startedAt)).Int("tag_count", len(imgByTag)).Msg("docker image cache has been updated")
+}
+
+// getImagesFromSeveralRepositories fetches images from the given list of repositories.
+//
+// It spawns a goroutine for each repository that collects images from it.
+// Then it merges all the lists of images. If there are several occurrences of an image tag in two repositories,
+// the data is taken from the first repository.
+//
+// It returns a list of images and a map that links an image to its tag.
+func (c *Cache) getImagesFromSeveralRepositories(repositories []string) ([]Image, map[string]Image, error) {
 	g, _ := errgroup.WithContext(c.ctx)
-	imagesByRepo := make([][]Image, len(c.config.Repositories))
-	for i := range c.config.Repositories {
+	imagesByRepo := make([][]Image, len(repositories))
+	for i := range repositories {
 		i := i
 
 		g.Go(func() error {
-			images, err := c.getImages(c.config.Repositories[i])
+			images, err := c.getImages(repositories[i])
 			if err != nil {
 				return err
 			}
@@ -163,7 +185,7 @@ func (c *Cache) asyncUpdate() {
 	err := g.Wait()
 	if err != nil {
 		c.logger.Err(err).Msg("failed to update docker image cache")
-		return
+		return nil, nil, err
 	}
 
 	var merged []Image
@@ -183,18 +205,11 @@ func (c *Cache) asyncUpdate() {
 		}
 	}
 
-	func() {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-
-		c.updatedAt = time.Now()
-		c.imageByTag = imgByTag
-		c.images = merged
-	}()
-
-	c.logger.Debug().Dur("elapsed", time.Since(startedAt)).Int("tag_count", len(imgByTag)).Msg("docker image cache has been updated")
+	return merged, imgByTag, nil
 }
 
+// getImages returns a list of images from the given dockerhub repository.
+// It fetches all images and filters them by the supported OS and architecture.
 func (c *Cache) getImages(repository string) ([]Image, error) {
 	tags, err := c.cli.GetTags(repository)
 	if err != nil {
