@@ -18,18 +18,16 @@ type statusCollector struct {
 	engine *engineProvider
 	metr   *metrics.RunnerStatusExporter
 
-	repository string
-	frequency  time.Duration
+	frequency time.Duration
 }
 
-func newStatusCollector(ctx context.Context, logger zerolog.Logger, repo string, collectFrequency time.Duration, engine *engineProvider, metr *metrics.RunnerStatusExporter) *statusCollector {
+func newStatusCollector(ctx context.Context, logger zerolog.Logger, collectFrequency time.Duration, engine *engineProvider, metr *metrics.RunnerStatusExporter) *statusCollector {
 	return &statusCollector{
-		ctx:        ctx,
-		logger:     logger,
-		engine:     engine,
-		metr:       metr,
-		repository: repo,
-		frequency:  collectFrequency,
+		ctx:       ctx,
+		logger:    logger,
+		engine:    engine,
+		metr:      metr,
+		frequency: collectFrequency,
 	}
 }
 
@@ -79,7 +77,7 @@ func (s *statusCollector) collect() error {
 }
 
 func (s *statusCollector) collectImages() (count uint, space uint64, err error) {
-	images, err := s.engine.getImages(s.ctx, s.repository, true)
+	images, err := s.engine.getImages(s.ctx, true)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to get images from engine")
 	}

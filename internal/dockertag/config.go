@@ -5,7 +5,7 @@ import "time"
 const DefaultExpirationTime = 5 * time.Minute
 
 type Config struct {
-	Image        string
+	Repositories []string
 	OS           string
 	Architecture string
 

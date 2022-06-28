@@ -35,8 +35,8 @@ func NewClient(apiURL string, maxRPS int, httpCli ...*http.Client) *Client {
 }
 
 // GetTags fetches tags of the given image.
-func (c *Client) GetTags(image string) ([]ImageTag, error) {
-	nextURL := fmt.Sprintf("%s/repositories/%s/tags/", c.apiURL, image)
+func (c *Client) GetTags(repository string) ([]ImageTag, error) {
+	nextURL := fmt.Sprintf("%s/repositories/%s/tags/", c.apiURL, repository)
 
 	var tags []ImageTag
 	for {

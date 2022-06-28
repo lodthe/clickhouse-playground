@@ -2,9 +2,9 @@ package dockertag
 
 import "time"
 
-type ImageTag struct {
-	ImageName string
-	TagName   string
+type Image struct {
+	Repository string
+	Tag        string
 
 	OS           string
 	Architecture string

@@ -17,21 +17,19 @@ type garbageCollector struct {
 
 	logger zerolog.Logger
 
-	cfg        *GCConfig
-	repository string
+	cfg *GCConfig
 
 	engine *engineProvider
 	metr   *metrics.RunnerGCExporter
 }
 
-func newGarbageCollector(ctx context.Context, logger zerolog.Logger, cfg *GCConfig, repository string, engine *engineProvider, metr *metrics.RunnerGCExporter) *garbageCollector {
+func newGarbageCollector(ctx context.Context, logger zerolog.Logger, cfg *GCConfig, engine *engineProvider, metr *metrics.RunnerGCExporter) *garbageCollector {
 	return &garbageCollector{
-		ctx:        ctx,
-		logger:     logger,
-		cfg:        cfg,
-		repository: repository,
-		engine:     engine,
-		metr:       metr,
+		ctx:    ctx,
+		logger: logger,
+		cfg:    cfg,
+		engine: engine,
+		metr:   metr,
 	}
 }
 
@@ -157,7 +155,7 @@ func (g *garbageCollector) collectImages() (count uint, spaceReclaimed uint64, e
 		g.metr.ContainersCollected(count, spaceReclaimed, startedAt)
 	}()
 
-	images, err := g.engine.getImages(g.ctx, g.repository, true)
+	images, err := g.engine.getImages(g.ctx, true)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to list images")
 	}

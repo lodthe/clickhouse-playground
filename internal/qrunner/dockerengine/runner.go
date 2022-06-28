@@ -21,8 +21,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type ImageTagStorage interface {
-	Get(version string) *dockertag.ImageTag
+type ImageStorage interface {
+	Find(version string) (dockertag.Image, bool)
 }
 
 // Runner is a runner that creates database instances using Docker Engine API.
@@ -39,7 +39,7 @@ type Runner struct {
 	cfg  Config
 
 	engine       *engineProvider
-	tagStorage   ImageTagStorage
+	tagStorage   ImageStorage
 	pipelineMetr *metrics.PipelineExporter
 
 	workers sync.WaitGroup
@@ -47,7 +47,7 @@ type Runner struct {
 	status  *statusCollector
 }
 
-func New(ctx context.Context, logger zerolog.Logger, name string, cfg Config, tagStorage ImageTagStorage) (*Runner, error) {
+func New(ctx context.Context, logger zerolog.Logger, name string, cfg Config, tagStorage ImageStorage) (*Runner, error) {
 	engine, err := newProvider(ctx, cfg.DaemonURL)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create Docker engine provider")
@@ -56,8 +56,8 @@ func New(ctx context.Context, logger zerolog.Logger, name string, cfg Config, ta
 	ctx, cancel := context.WithCancel(ctx)
 
 	logger = logger.With().Str("runner", name).Logger()
-	gc := newGarbageCollector(ctx, logger, cfg.GC, cfg.Repository, engine, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name))
-	status := newStatusCollector(ctx, logger, cfg.Repository, cfg.StatusCollectionFrequency, engine, metrics.NewRunnerStatusExporter(string(qrunner.TypeDockerEngine), name))
+	gc := newGarbageCollector(ctx, logger, cfg.GC, engine, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name))
+	status := newStatusCollector(ctx, logger, cfg.StatusCollectionFrequency, engine, metrics.NewRunnerStatusExporter(string(qrunner.TypeDockerEngine), name))
 
 	return &Runner{
 		ctx:          ctx,
@@ -177,14 +177,14 @@ func (r *Runner) RunQuery(ctx context.Context, runID string, query string, versi
 // pull checks whether the requested image exists. If no, it will be downloaded and renamed to hashed-name.
 func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 	startedAt := time.Now()
-	imageName := qrunner.FullImageName(r.cfg.Repository, state.version)
 
-	tag := r.tagStorage.Get(state.version)
-	if tag == nil {
+	img, found := r.tagStorage.Find(state.version)
+	if !found {
 		return errors.New("version not found")
 	}
 
-	state.chpImageName = qrunner.PlaygroundImageName(r.cfg.Repository, tag.Digest)
+	imageName := qrunner.FullImageName(img.Repository, state.version)
+	state.chpImageName = qrunner.PlaygroundImageName(img.Repository, img.Digest)
 
 	if r.checkIfImageExists(ctx, state) {
 		return nil

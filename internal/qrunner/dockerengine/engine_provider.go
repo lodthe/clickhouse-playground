@@ -97,7 +97,7 @@ func (p *engineProvider) getImageByID(ctx context.Context, name string) (types.I
 
 // getImages returns existing images.
 // If filterChp is true, only created by the playground images are returned.s
-func (p *engineProvider) getImages(ctx context.Context, repository string, filterChp bool) ([]types.ImageSummary, error) {
+func (p *engineProvider) getImages(ctx context.Context, filterChp bool) ([]types.ImageSummary, error) {
 	images, err := p.cli.ImageList(ctx, types.ImageListOptions{
 		All: true,
 	})
@@ -109,7 +109,7 @@ func (p *engineProvider) getImages(ctx context.Context, repository string, filte
 	for i := 0; i < len(images); i++ {
 		var matched bool
 		for _, tag := range images[i].RepoTags {
-			if qrunner.IsPlaygroundImageName(tag, repository) {
+			if qrunner.IsPlaygroundImageName(tag) {
 				matched = true
 				break
 			}
