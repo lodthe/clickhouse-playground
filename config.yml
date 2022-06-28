@@ -6,7 +6,10 @@ log_level: info
 
 # ClickHouse Docker image configuration.
 docker_image:
-  repository: clickhouse/clickhouse-server
+  repositories:
+    - clickhouse/clickhouse-server
+    - yandex/clickhouse-server
+
   os: linux
   architecture: amd64
 

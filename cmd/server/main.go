@@ -66,13 +66,11 @@ func main() {
 	dynamodbClient := dynamodb.NewFromConfig(awsConfig)
 	dockerhubCli := dockerhub.NewClient(dockerhub.DockerHubURL, dockerhub.DefaultMaxRPS)
 	tagStorage := dockertag.NewCache(ctx, dockertag.Config{
-		Image: dockertag.ImageConfig{
-			Repository:   config.DockerImage.Repository,
-			OS:           config.DockerImage.OS,
-			Architecture: config.DockerImage.Architecture,
-		},
+		Repositories:   config.DockerImage.Repositories,
+		OS:             config.DockerImage.OS,
+		Architecture:   config.DockerImage.Architecture,
 		ExpirationTime: config.DockerImage.CacheExpirationTime,
-	}, dockerhubCli)
+	}, logger, dockerhubCli)
 	tagStorage.RunBackgroundUpdate()
 
 	// Create runners and the coordinator.

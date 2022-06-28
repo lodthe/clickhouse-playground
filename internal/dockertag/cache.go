@@ -2,6 +2,7 @@ package dockertag
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -9,7 +10,9 @@ import (
 
 	"clickhouse-playground/pkg/dockerhub"
 
-	zlog "github.com/rs/zerolog/log"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
 )
 
 type DockerHubClient interface {
@@ -20,6 +23,7 @@ type DockerHubClient interface {
 type Cache struct {
 	ctx    context.Context
 	config Config
+	logger zerolog.Logger
 	cli    DockerHubClient
 
 	updating int32
@@ -30,10 +34,11 @@ type Cache struct {
 	images     []Image
 }
 
-func NewCache(ctx context.Context, config Config, cli DockerHubClient) *Cache {
+func NewCache(ctx context.Context, config Config, logger zerolog.Logger, cli DockerHubClient) *Cache {
 	return &Cache{
 		ctx:        ctx,
 		config:     config,
+		logger:     logger,
 		cli:        cli,
 		imageByTag: make(map[string]Image),
 	}
@@ -52,7 +57,7 @@ func (c *Cache) backgroundUpdate() {
 		c.updateIfExpired()
 	}
 
-	zlog.Info().Msg("docker tag cache update background task has been started")
+	c.logger.Info().Msg("docker tag cache update background task has been started")
 
 	update()
 	t := time.NewTicker(c.config.ExpirationTime)
@@ -61,7 +66,7 @@ func (c *Cache) backgroundUpdate() {
 	for {
 		select {
 		case <-c.ctx.Done():
-			zlog.Info().Msg("docker tag cache update background task has been finished")
+			c.logger.Info().Msg("docker tag cache update background task has been finished")
 			return
 
 		case <-t.C:
@@ -125,6 +130,10 @@ func (c *Cache) updateIfExpired() {
 }
 
 // asyncUpdate fetches actual image list and updates the cache.
+// It spawns a goroutine for each repository that collects images from it.
+// Then it merges all the lists of images. If there are several occurrences of an image tag in two repositories,
+// the data is taken from the first repository
+//
 // The updating atomic is used to prevent simultaneous updates.
 func (c *Cache) asyncUpdate() {
 	// Release the acquired lock.
@@ -134,32 +143,43 @@ func (c *Cache) asyncUpdate() {
 
 	startedAt := time.Now()
 
-	tags, err := c.cli.GetTags(c.config.Image.Repository)
+	g, _ := errgroup.WithContext(c.ctx)
+	imagesByRepo := make([][]Image, len(c.config.Repositories))
+	for i := range c.config.Repositories {
+		i := i
+
+		g.Go(func() error {
+			images, err := c.getImages(c.config.Repositories[i])
+			if err != nil {
+				return err
+			}
+
+			imagesByRepo[i] = images
+
+			return nil
+		})
+	}
+
+	err := g.Wait()
 	if err != nil {
-		zlog.Error().Err(err).Str("image", c.config.Image.Repository).Msg("failed to get docker images")
+		c.logger.Err(err).Msg("failed to update docker image cache")
 		return
 	}
 
-	var flattened []Image
+	var merged []Image
 	imgByTag := make(map[string]Image)
+	for _, images := range imagesByRepo {
+		for _, img := range images {
+			tag := c.normalizeTag(img.Tag)
 
-	for _, t := range tags {
-		for _, i := range t.Images {
-			if !strings.EqualFold(i.OS, c.config.Image.OS) || !strings.EqualFold(i.Architecture, c.config.Image.Architecture) {
+			// If a tag is presented in several repositories, we save image from the first repo.
+			_, exists := imgByTag[tag]
+			if exists {
 				continue
 			}
 
-			converted := Image{
-				Repository:   c.config.Image.Repository,
-				Tag:          t.Name,
-				OS:           i.OS,
-				Architecture: i.Architecture,
-				Digest:       i.Digest,
-				PushedAt:     i.LastPushed,
-			}
-
-			imgByTag[c.normalizeTag(converted.Tag)] = converted
-			flattened = append(flattened, converted)
+			imgByTag[tag] = img
+			merged = append(merged, img)
 		}
 	}
 
@@ -169,8 +189,47 @@ func (c *Cache) asyncUpdate() {
 
 		c.updatedAt = time.Now()
 		c.imageByTag = imgByTag
-		c.images = flattened
+		c.images = merged
 	}()
 
-	zlog.Debug().Dur("elapsed", time.Since(startedAt)).Int("tag_count", len(imgByTag)).Msg("docker image tag cache has been updated")
+	c.logger.Debug().Dur("elapsed", time.Since(startedAt)).Int("tag_count", len(imgByTag)).Msg("docker image cache has been updated")
+}
+
+func (c *Cache) getImages(repository string) ([]Image, error) {
+	tags, err := c.cli.GetTags(repository)
+	if err != nil {
+		c.logger.Error().Err(err).Str("repository", repository).Msg("failed to get dockerhub tags")
+		return nil, errors.Wrap(err, "failed to get tags from dockerhub")
+	}
+
+	c.logger.Debug().Str("repository", repository).Msg("start fetching images")
+
+	var images []Image
+
+	for _, t := range tags {
+		for _, i := range t.Images {
+			if !strings.EqualFold(i.OS, c.config.OS) || !strings.EqualFold(i.Architecture, c.config.Architecture) {
+				continue
+			}
+
+			converted := Image{
+				Repository:   repository,
+				Tag:          t.Name,
+				OS:           i.OS,
+				Architecture: i.Architecture,
+				Digest:       i.Digest,
+				PushedAt:     i.LastPushed,
+			}
+
+			images = append(images, converted)
+		}
+	}
+
+	c.logger.Debug().Str("repository", repository).Int("count", len(images)).Msg("images have been fetched")
+
+	sort.Slice(images, func(i, j int) bool {
+		return images[i].PushedAt.After(images[j].PushedAt)
+	})
+
+	return images, nil
 }
