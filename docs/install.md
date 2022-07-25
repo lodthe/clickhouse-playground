@@ -90,6 +90,14 @@ the host socket and specify [remote runners](./remote-daemon.md).
 
 ### Running services
 
+Docker-compose services communicate with themselves, that's why they
+have to be run in the same network namespace. 
+Let's create a [Bridge network](https://docs.docker.com/network/bridge/)
+for them:
+```bash
+sudo docker network create playground
+```
+
 Now you are ready to run the playground: `docker-compose up -d`.
 By default, services expose the following ports:
 - **playground** &mdash; :9000.
