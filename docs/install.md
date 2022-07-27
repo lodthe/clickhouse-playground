@@ -46,7 +46,7 @@ the `deploy` directory:
 git clone git@github.com:lodthe/clickhouse-playground.git
 
 # HTTPS version:
-# git clone https://github.com/brandtbucher/specialist.git
+# git clone https://github.com/lodthe/clickhouse-playground.git
 
 cd clickhouse-playground/deploy
 ls -lah
@@ -77,6 +77,7 @@ The given docker-compose file defines the following services:
 - **cadvisor** for exporting resources usage by docker containers;
 - **grafana** for metrics visualization;
 - **playground** for serving user requests and running queries.
+- **webapp** for accessing the playground from a browser.
 
 Services other than playground are supplementary and can be
 commented/deleted. Also, there are commented services `nginx` and `certbot`.
@@ -87,6 +88,22 @@ You might have noticed that the host docker daemon socket is mounted in the
 playground container. The playground services needs access to the host
 docker daemon to run ClickHouse containers locally. You may unmount 
 the host socket and specify [remote runners](./remote-daemon.md).
+
+### Building the web application
+
+If you want to have a front-end application, you have to build an image.
+
+Fast way:
+```bash
+git clone git@github.com:lodthe/clickhouse-playground-ui.git
+cd clickhouse-playground-ui
+
+# An address of the backend API (users will use it when accessing the playground).
+export API_URL='https://playground.lodthe.me/api/'
+docker build --build-arg API_URL="$API_URL" -t lodthe/clickhouse-playground-ui
+```
+
+Refer to the [clickhouse-playground-ui](https://github.com/lodthe/clickhouse-playground-ui) readme for more information.
 
 ### Running services
 
@@ -106,7 +123,3 @@ By default, services expose the following ports:
 
 You can check the status of services via `docker-compose ps` and 
 see logs via `docker-compose logs -f <service name>`.
-
-## Running the web application
-
-TBD.
