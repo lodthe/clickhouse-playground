@@ -44,17 +44,17 @@ func TestCmdRunQuery(t *testing.T) {
 		{
 			containerID: "2939fbb1c",
 			query:       "SELECT * FROM system.clusters;\n\nSELECT 'HELLO'",
-			want:        "docker exec 2939fbb1c clickhouse-client -n -m --query \"SELECT * FROM system.clusters;\n\nSELECT 'HELLO'\"",
+			want:        "docker exec 2939fbb1c clickhouse client -n -m --query \"SELECT * FROM system.clusters;\n\nSELECT 'HELLO'\"",
 		},
 		{
 			containerID: "CONTAINER",
 			query:       "rm -rf",
-			want:        "docker exec CONTAINER clickhouse-client -n -m --query \"rm -rf\"",
+			want:        "docker exec CONTAINER clickhouse client -n -m --query \"rm -rf\"",
 		},
 		{
 			containerID: "c3392c129",
 			query:       "SELECT 1\" rm -rf \"rm -rf' rm -rf",
-			want:        "docker exec c3392c129 clickhouse-client -n -m --query \"SELECT 1\\\" rm -rf \\\"rm -rf' rm -rf\"",
+			want:        "docker exec c3392c129 clickhouse client -n -m --query \"SELECT 1\\\" rm -rf \\\"rm -rf' rm -rf\"",
 		},
 	}
 

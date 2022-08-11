@@ -18,7 +18,7 @@ func cmdRunContainer(repository, version string) string {
 // TODO: fix shell injection.
 func cmdRunQuery(containerID string, query string) string {
 	query = strings.ReplaceAll(query, "\"", "\\\"")
-	return fmt.Sprintf("docker exec %s clickhouse-client -n -m --query \"%s\"", containerID, query) // nolint
+	return fmt.Sprintf("docker exec %s clickhouse client -n -m --query \"%s\"", containerID, query) // nolint
 }
 
 // cmdKillContainer generates a shell command to kill the running container.

@@ -95,8 +95,10 @@ func main() {
 	router := api.NewRouter(config.API.ServerTimeout, coord, tagStorage, runRepo, lim.MaxQueryLength, lim.MaxOutputLength)
 
 	srv := &http.Server{
-		Addr:    config.API.ListeningAddress,
-		Handler: router,
+		Addr:              config.API.ListeningAddress,
+		Handler:           router,
+		ReadTimeout:       10 * time.Second,
+		ReadHeaderTimeout: 2 * time.Second,
 	}
 	go func() {
 		zlog.Info().Str("address", config.API.ListeningAddress).Msg("starting the server")
