@@ -29,6 +29,6 @@ Users communicate with the playground using REST API.
 
 ---
 
-- [Playground](https://playground.lodthe.me/)
+- [Playground](https://fiddle.clickhouse.com/)
 - [Documentation](./docs/readme.md)
 - [Installation guide](./docs/install.md)

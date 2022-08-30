@@ -99,7 +99,7 @@ git clone git@github.com:lodthe/clickhouse-playground-ui.git
 cd clickhouse-playground-ui
 
 # An address of the backend API (users will use it when accessing the playground).
-export API_URL='https://playground.lodthe.me/api/'
+export API_URL='https://fiddle.clickhouse.com/api/'
 docker build --build-arg API_URL="$API_URL" -t lodthe/clickhouse-playground-ui
 ```
 

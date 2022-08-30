@@ -5,7 +5,7 @@ if ! [ -x "$(command -v docker-compose)" ]; then
   exit 1
 fi
 
-domains=(playground.lodthe.me www.playground.lodthe.me)
+domains=(fiddle.clickhouse.com www.fiddle.clickhouse.com)
 rsa_key_size=4096
 data_path="./data/certbot"
 email="baliuk.igor@gmail.com" # Adding a valid address is strongly recommended

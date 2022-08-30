@@ -61,7 +61,7 @@ correctly and the status code is 200.
 
 ---
 
-The base URI is `https://playground.lodthe.me/`.
+The base URI is `https://fiddle.clickhouse.com/`.
 
 ### List available ClickHouse versions
 
@@ -93,7 +93,7 @@ Returned versions are just DockerHub image tags.
 
 Example:
 ```yml
-curl -XGET https://playground.lodthe.me/api/tags
+curl -XGET https://fiddle.clickhouse.com/api/tags
 
 # 200 OK
 {
@@ -175,7 +175,7 @@ for an incoming request, so it may some time to process the query
 
 Example:
 ```yml
-curl -XPOST https://playground.lodthe.me/api/runs -d '{ \
+curl -XPOST https://fiddle.clickhouse.com/api/runs -d '{ \
   "version": "22.5.1", \
   "query": "SELECT * FROM numbers(0, 5)" \
 }'
@@ -253,7 +253,7 @@ You can get information about a previously processed query.
 
 Example:
 ```yml
-curl -XGET https://playground.lodthe.me/api/runs/1bcb005d-f466-4036-a5e3-81c723096913
+curl -XGET https://fiddle.clickhouse.com/api/runs/1bcb005d-f466-4036-a5e3-81c723096913
 
 # 200 OK
 {
