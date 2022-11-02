@@ -85,7 +85,7 @@ linters:
 run:
   skip-dirs:
     - .infra
-  go: '1.17'
+  go: "1.19"
 issues:
   exclude-rules:
     - linters:
@@ -99,6 +99,6 @@ issues:
         - unparam
 
 service:
-  golangci-lint-version: 1.48.0 # use the fixed version to not introduce new linters unexpectedly
+  golangci-lint-version: 1.50.0 # use the fixed version to not introduce new linters unexpectedly
   prepare:
     - echo "here I can run custom commands, but no preparation needed for this repo"

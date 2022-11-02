@@ -1,5 +1,4 @@
 name: Lint Go code
-
 on:
   push:
     tags:
@@ -7,14 +6,20 @@ on:
     branches:
       - main
   pull_request:
-
+permissions:
+  contents: read
+  pull-requests: read
 jobs:
   golangci:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+      - uses: actions/setup-go@v3
         with:
-          version: v1.48.0
+          go-version: 1.19
+      - uses: actions/checkout@v3
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.50.0
+          only-new-issues: true
