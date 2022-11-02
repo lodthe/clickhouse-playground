@@ -2,7 +2,9 @@ package dockertag
 
 import (
 	"context"
+	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -204,9 +206,35 @@ func (c *Cache) getImagesFromSeveralRepositories(repositories []string) ([]Image
 			merged = append(merged, img)
 		}
 	}
-	
+
 	sort.Slice(merged, func(i, j int) bool {
-    		return merged[i].Tag > merged[j].Tag
+		splitted_i := strings.FieldsFunc(merged[i].Tag, func(r rune) bool {
+			return r == '.' || r == '-'
+		})
+		splitted_j := strings.FieldsFunc(merged[j].Tag, func(r rune) bool {
+			return r == '.' || r == '-'
+		})
+
+		minLength := int(math.Min(float64(len(splitted_i)), float64(len(splitted_j))))
+
+		for k := 0; k < minLength; k++ {
+			curNumber_i, err1 := strconv.Atoi(splitted_i[k])
+			curNumber_j, err2 := strconv.Atoi(splitted_j[k])
+
+			if err1 == nil && err2 != nil {
+				return false
+			} else if err1 != nil && err2 == nil {
+				return true
+			} else if err1 == nil && err2 == nil {
+				if curNumber_i != curNumber_j {
+					return curNumber_i > curNumber_j
+				}
+			} else if splitted_i[k] != splitted_j[k] {
+				return splitted_i[k] > splitted_i[k]
+			}
+		}
+
+		return len(splitted_i) < len(splitted_j)
 	})
 
 	return merged, imgByTag, nil
