@@ -204,6 +204,10 @@ func (c *Cache) getImagesFromSeveralRepositories(repositories []string) ([]Image
 			merged = append(merged, img)
 		}
 	}
+	
+	sort.Slice(merged, func(i, j int) bool {
+    		return merged[i].Tag > merged[j].Tag
+	})
 
 	return merged, imgByTag, nil
 }
