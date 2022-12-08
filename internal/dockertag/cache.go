@@ -3,6 +3,7 @@ package dockertag
 import (
 	"context"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -188,7 +189,6 @@ func (c *Cache) getImagesFromSeveralRepositories(repositories []string) ([]Image
 		return nil, nil, err
 	}
 
-	var merged []Image
 	imgByTag := make(map[string]Image)
 	for _, images := range imagesByRepo {
 		for _, img := range images {
@@ -201,11 +201,10 @@ func (c *Cache) getImagesFromSeveralRepositories(repositories []string) ([]Image
 			}
 
 			imgByTag[tag] = img
-			merged = append(merged, img)
 		}
 	}
 
-	return merged, imgByTag, nil
+	return c.sortImages(imgByTag), imgByTag, nil
 }
 
 // getImages returns a list of images from the given dockerhub repository.
@@ -247,4 +246,113 @@ func (c *Cache) getImages(repository string) ([]Image, error) {
 	})
 
 	return images, nil
+}
+
+var headOfListTags = []string{
+	"head",
+	"head-alpine",
+	"latest",
+	"latest-alpine",
+}
+
+var tagsToDrop = []string{
+	"12334",
+	"12334-eefeec2519f5bdfec4516395a684ff570b5560a6",
+}
+
+// sortImages orders image list in human-readable order.
+func (c *Cache) sortImages(imgByTag map[string]Image) []Image {
+	copied := make(map[string]Image, len(imgByTag))
+	for k, v := range imgByTag {
+		copied[k] = v
+	}
+	imgByTag = copied
+
+	// Drop whitelisted tags and remember potential head of the list.
+	for _, tag := range tagsToDrop {
+		delete(imgByTag, tag)
+	}
+
+	seenHeadOfList := make(map[string]Image, len(headOfListTags))
+	for _, tag := range headOfListTags {
+		img, found := imgByTag[tag]
+		if !found {
+			continue
+		}
+
+		seenHeadOfList[tag] = img
+		delete(imgByTag, tag)
+	}
+
+	images := make([]Image, 0, len(imgByTag))
+	for _, i := range imgByTag {
+		images = append(images, i)
+	}
+
+	sortedImages := make([]Image, 0, len(seenHeadOfList)+len(images))
+
+	// Split a tag by '.' and save this representation to use it in comparator.
+	parsed := make([][]int64, len(images))
+	ids := make([]int, 0, len(images))
+	withSemverIncompatibleTags := make([]Image, 0)
+	for id, img := range images {
+		splitted := strings.Split(img.Tag, ".")
+		integer := make([]int64, len(splitted))
+
+		var foundError bool
+		for i, token := range splitted {
+			var err error
+			integer[i], err = strconv.ParseInt(token, 10, 64)
+			if err != nil {
+				foundError = true
+				break
+			}
+		}
+
+		parsed[id] = integer
+
+		// If no error has been occurred, we can compare this version with others.
+		// Otherwise, we will add invalid semver images after the head of list.
+		if foundError {
+			withSemverIncompatibleTags = append(withSemverIncompatibleTags, img)
+		} else {
+			ids = append(ids, id)
+		}
+	}
+
+	sort.Slice(ids, func(i, j int) bool {
+		return compareSemvers(parsed[ids[i]], parsed[ids[j]])
+	})
+
+	// At first, head of list images must be added.
+	for _, tag := range headOfListTags {
+		img, found := seenHeadOfList[tag]
+		if !found {
+			continue
+		}
+
+		sortedImages = append(sortedImages, img)
+	}
+
+	sort.Slice(withSemverIncompatibleTags, func(i, j int) bool {
+		return withSemverIncompatibleTags[i].Tag < withSemverIncompatibleTags[j].Tag
+	})
+	sortedImages = append(sortedImages, withSemverIncompatibleTags...)
+
+	for _, id := range ids {
+		sortedImages = append(sortedImages, images[id])
+	}
+
+	return sortedImages
+}
+
+// compareSemvers takes two splitted semver representations and compares them.
+func compareSemvers(a, b []int64) bool {
+	for i := 0; i < len(a) && i < len(b); i++ {
+		if a[i] != b[i] {
+			return a[i] > b[i]
+		}
+	}
+
+	return len(a) > len(b)
 }
