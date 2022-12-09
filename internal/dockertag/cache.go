@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"clickhouse-playground/pkg/dockerhub"
 
@@ -249,10 +250,10 @@ func (c *Cache) getImages(repository string) ([]Image, error) {
 }
 
 var headOfListTags = []string{
-	"head",
 	"head-alpine",
-	"latest",
+	"head",
 	"latest-alpine",
+	"latest",
 }
 
 var tagsToDrop = []string{
@@ -292,32 +293,14 @@ func (c *Cache) sortImages(imgByTag map[string]Image) []Image {
 	sortedImages := make([]Image, 0, len(seenHeadOfList)+len(images))
 
 	// Split a tag by '.' and save this representation to use it in comparator.
-	parsed := make([][]int64, len(images))
-	ids := make([]int, 0, len(images))
-	withSemverIncompatibleTags := make([]Image, 0)
+	parsed := make([][]string, len(images))
+	ids := make([]int, len(images))
 	for id, img := range images {
-		splitted := strings.Split(img.Tag, ".")
-		integer := make([]int64, len(splitted))
+		parsed[id] = strings.FieldsFunc(img.Tag, func(r rune) bool {
+			return r == '.' || r == '-' || unicode.IsSpace(r)
+		})
 
-		var foundError bool
-		for i, token := range splitted {
-			var err error
-			integer[i], err = strconv.ParseInt(token, 10, 64)
-			if err != nil {
-				foundError = true
-				break
-			}
-		}
-
-		parsed[id] = integer
-
-		// If no error has been occurred, we can compare this version with others.
-		// Otherwise, we will add invalid semver images after the head of list.
-		if foundError {
-			withSemverIncompatibleTags = append(withSemverIncompatibleTags, img)
-		} else {
-			ids = append(ids, id)
-		}
+		ids[id] = id
 	}
 
 	sort.Slice(ids, func(i, j int) bool {
@@ -334,11 +317,6 @@ func (c *Cache) sortImages(imgByTag map[string]Image) []Image {
 		sortedImages = append(sortedImages, img)
 	}
 
-	sort.Slice(withSemverIncompatibleTags, func(i, j int) bool {
-		return withSemverIncompatibleTags[i].Tag < withSemverIncompatibleTags[j].Tag
-	})
-	sortedImages = append(sortedImages, withSemverIncompatibleTags...)
-
 	for _, id := range ids {
 		sortedImages = append(sortedImages, images[id])
 	}
@@ -347,10 +325,17 @@ func (c *Cache) sortImages(imgByTag map[string]Image) []Image {
 }
 
 // compareSemvers takes two splitted semver representations and compares them.
-func compareSemvers(a, b []int64) bool {
+func compareSemvers(a, b []string) bool {
 	for i := 0; i < len(a) && i < len(b); i++ {
-		if a[i] != b[i] {
-			return a[i] > b[i]
+		numA, errA := strconv.ParseUint(a[i], 10, 64)
+		numB, errB := strconv.ParseUint(b[i], 10, 64)
+
+		if errA == nil && errB == nil {
+			if numA != numB {
+				return numA > numB
+			}
+		} else {
+			return a[i] < b[i]
 		}
 	}
 

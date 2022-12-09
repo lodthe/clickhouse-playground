@@ -96,8 +96,8 @@ func TestGetImagesFromSeveralRepositories(t *testing.T) {
 	assert.Len(t, images, 3)
 	assert.Len(t, imgByTag, 3)
 
-	assert.Equal(t, "latest", images[0].Tag)
-	assert.Equal(t, "latest-alpine", images[1].Tag)
+	assert.Equal(t, "latest-alpine", images[0].Tag)
+	assert.Equal(t, "latest", images[1].Tag)
 	assert.Equal(t, "21.8", images[2].Tag)
 
 	for _, img := range images {
@@ -114,7 +114,7 @@ func TestSortImages(t *testing.T) {
 		{
 			name:   "a lot of different images",
 			input:  []string{"1.2.3", "12.3.4", "1", "0.2", "head", "5.2.1", "5", "head-alpine"},
-			wanted: []string{"head", "head-alpine", "12.3.4", "5.2.1", "5", "1.2.3", "1", "0.2"},
+			wanted: []string{"head-alpine", "head", "12.3.4", "5.2.1", "5", "1.2.3", "1", "0.2"},
 		},
 		{
 			name:   "must be dropped",
@@ -128,8 +128,8 @@ func TestSortImages(t *testing.T) {
 		},
 		{
 			name:   "with semver incompatible",
-			input:  []string{"1.2.3", "12.3.4", "1", "lololo.incompatible", "0.2", "head", "5.2.1", "head-alpine", "1.alpha"},
-			wanted: []string{"head", "head-alpine", "1.alpha", "lololo.incompatible", "12.3.4", "5.2.1", "1.2.3", "1", "0.2"},
+			input:  []string{"1.2.3", "12.3.4", "1", "lololo.incompatible", "0.2", "head", "5.2.1", "1.2.3-alpine", "head-alpine", "1-alpine"},
+			wanted: []string{"head-alpine", "head", "12.3.4", "5.2.1", "1.2.3-alpine", "1.2.3", "1-alpine", "1", "0.2", "lololo.incompatible"},
 		},
 	}
 
