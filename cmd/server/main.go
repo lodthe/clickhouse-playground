@@ -114,7 +114,7 @@ func main() {
 	go func() {
 		zlog.Info().Str("address", config.PrometheusExportAddress).Msg("starting the prometheus exporter")
 
-		http.Handle("/metrics", promhttp.Handler())
+		http.Handle("/metrics", promhttp.Handler()) // nolint:gosec
 		err := http.ListenAndServe(config.PrometheusExportAddress, nil)
 		if err != nil {
 			zlog.Error().Err(err).Msg("prometheus exporter failed")
