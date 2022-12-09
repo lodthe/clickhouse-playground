@@ -97,8 +97,9 @@ func main() {
 	srv := &http.Server{
 		Addr:              config.API.ListeningAddress,
 		Handler:           router,
-		ReadTimeout:       10 * time.Second,
-		ReadHeaderTimeout: 2 * time.Second,
+		ReadTimeout:       20 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      30 * time.Second,
 	}
 	go func() {
 		zlog.Info().Str("address", config.API.ListeningAddress).Msg("starting the server")
