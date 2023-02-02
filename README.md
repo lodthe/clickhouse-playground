@@ -1,19 +1,18 @@
 # ClickHouse Playground
 
-ClickHouse Playground is a tool for running SQL queries online, from a browser.
-It allows ClickHouse community to run any queries in arbitrary ClickHouse version
+ClickHouse Playground allows running SQL queries from a browser without having a database instance on the user's side.
+It allows to run any queries in arbitrary ClickHouse version
 and share the execution results with others.
 
 Try it out: [fiddle.clickhouse.com](https://fiddle.clickhouse.com).
 
-This repository contains back-end logic of the platform. 
-The source code of the web application is available [here](https://github.com/lodthe/clickhouse-playground-ui).
+You can read about the motivation and more technicalities at the [About](./docs/about.md) page.
 
 ## Architecture overview
 
 ---
 
-![architecture overview](./docs/content/arch-overview.svg)
+![architecture overview](./docs/content/pretty-design.svg)
 
 There is a coordinator that creates a Docker container with a desired ClickHouse
 version for every incoming user request. Containers are created on runners,
