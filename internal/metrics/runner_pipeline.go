@@ -20,7 +20,7 @@ func NewPipelineExporter(runnerType, runnerName string) *PipelineExporter {
 				Name:        "pipeline_step_duration_seconds",
 				Help:        "How long it took to process a runner pipeline step, partitioned by step name, database version and status (success or failure).",
 				ConstLabels: runnerLabels,
-				Buckets:     []float64{.01, .05, .1, .25, .5, 1, 2.5, 5, 10, 15, 30},
+				Buckets:     defaultPipelineBuckets,
 			},
 			[]string{"step", "version", "status"},
 		),

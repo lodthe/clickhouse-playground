@@ -21,7 +21,7 @@ var RestAPI = RestAPIExporter{
 			Namespace: "http",
 			Name:      "request_duration_seconds",
 			Help:      "How long it took to handle the request.",
-			Buckets:   []float64{.005, .01, .05, .1, .25, .5, 1, 2.5, 5, 10, 15, 30},
+			Buckets:   defaultPipelineBuckets,
 		},
 		[]string{"method", "path", "status"},
 	),
