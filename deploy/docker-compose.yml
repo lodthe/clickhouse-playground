@@ -9,18 +9,16 @@ networks:
     external: true
 
 services:
-# Uncomment if you want to have a webserver
-#
-#  nginx:
-#    networks:
-#      - playground
-#    image: nginx
-#    ports:
-#      - '80:80'
-#      - '443:443'
-#    volumes:
-#      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-#    restart: unless-stopped
+  # nginx:
+  #   networks:
+  #     - playground
+  #   image: nginx
+  #   ports:
+  #     - '80:80'
+  #     - '443:443'
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #   restart: unless-stopped
 
   prometheus:
     networks:
@@ -32,6 +30,7 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=1y'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
     ports:
@@ -69,16 +68,10 @@ services:
     ports:
       - '3000:3000'
 
-#  webapp:
-#    networks:
-#      - playground
-#    image: lodthe/clickhouse-playground-ui
-#    restart: unless-stopped
-
   playground:
     networks:
       - playground
-    image: lodthe/clickhouse-playground
+    image: lodthe/clickhouse-playground:latest
     environment:
       CONFIG_PATH: /config.yml
     volumes:
@@ -86,4 +79,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - '9000:9000'
+    restart: unless-stopped
+
+  webapp:
+    networks:
+      - playground
+    image: lodthe/clickhouse-playground-ui:latest
     restart: unless-stopped
