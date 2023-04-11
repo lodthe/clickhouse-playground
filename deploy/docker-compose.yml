@@ -9,16 +9,21 @@ networks:
     external: true
 
 services:
-  # nginx:
-  #   networks:
-  #     - playground
-  #   image: nginx
-  #   ports:
-  #     - '80:80'
-  #     - '443:443'
-  #   volumes:
-  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
-  #   restart: unless-stopped
+  nginx:
+    networks:
+      - playground
+    image: nginx
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: 2
+          memory: 1g
 
   prometheus:
     networks:
@@ -36,6 +41,11 @@ services:
     ports:
       - '9090:9090'
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: 4
+          memory: 6g
 
   cadvisor:
     networks:
@@ -51,6 +61,11 @@ services:
     deploy:
       mode: global
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: 1g
 
   grafana:
     networks:
@@ -67,6 +82,11 @@ services:
       - grafana/.env
     ports:
       - '3000:3000'
+    deploy:
+      resources:
+        limits:
+          cpus: 2
+          memory: 2g
 
   playground:
     networks:
@@ -80,9 +100,19 @@ services:
     ports:
       - '9000:9000'
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: 2
+          memory: 2g
 
   webapp:
     networks:
       - playground
     image: lodthe/clickhouse-playground-ui:latest
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: 2
+          memory: 1g
