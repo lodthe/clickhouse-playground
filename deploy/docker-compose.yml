@@ -9,21 +9,35 @@ networks:
     external: true
 
 services:
-  nginx:
-    networks:
-      - playground
-    image: nginx
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: 2
-          memory: 1g
+  # nginx:
+  #   networks:
+  #     - playground
+  #   image: nginx
+  #   ports:
+  #     - '80:80'
+  #     - '443:443'
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: 2
+  #         memory: 1g
+
+  # nginx-prom-exporter:
+  #   networks:
+  #     - playground
+  #   image: nginx/nginx-prometheus-exporter:0.10.0
+  #   command: -nginx.scrape-uri="http://nginx:8080/stub_status"
+  #   ports:
+  #     - '9113:9113'
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: 0.5
+  #         memory: 512m
 
   prometheus:
     networks:
