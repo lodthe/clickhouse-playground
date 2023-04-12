@@ -254,9 +254,11 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 		r.pipelineMetr.CreateContainer(err == nil, state.version, invokedAt)
 	}()
 
+	// Network is disabled to prevent malicious attacks and to optimize container start up.
 	contConfig := &container.Config{
-		Image:  state.chpImageName,
-		Labels: qrunner.CreateContainerLabels(state.runID, state.version),
+		Image:           state.chpImageName,
+		Labels:          qrunner.CreateContainerLabels(state.runID, state.version),
+		NetworkDisabled: true,
 	}
 
 	hostConfig := &container.HostConfig{
