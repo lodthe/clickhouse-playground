@@ -17,7 +17,7 @@ require (
 
 require (
 	github.com/docker/cli v20.10.20+incompatible
-	github.com/docker/docker v20.10.20+incompatible
+	github.com/docker/docker v23.0.3+incompatible
 	github.com/gookit/config/v2 v2.1.0
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/prometheus/client_golang v1.14.0
