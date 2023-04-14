@@ -138,7 +138,7 @@ runners:
       # You can limit resources usage for a Docker container.
       # Refer to the official Docker documentation for more detail:
       # https://docs.docker.com/config/containers/resource_constraints/
-      container_resources:
+      container:
         # Specify how much of the available CPU resources a container can use.
         # Docker cli: docker run --cpus=2.5
         # Default: unlimited.

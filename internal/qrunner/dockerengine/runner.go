@@ -254,14 +254,19 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 		r.pipelineMetr.CreateContainer(err == nil, state.version, invokedAt)
 	}()
 
-	// Network is disabled to prevent malicious attacks and to optimize container start up.
 	contConfig := &container.Config{
-		Image:           state.chpImageName,
-		Labels:          qrunner.CreateContainerLabels(state.runID, state.version),
-		NetworkDisabled: true,
+		Image:  state.chpImageName,
+		Labels: qrunner.CreateContainerLabels(state.runID, state.version),
 	}
 
+	var networkMode string
+	if r.cfg.Container.NetworkMode != nil {
+		networkMode = *r.cfg.Container.NetworkMode
+	}
+
+	// Network is disabled to prevent malicious attacks and to optimize container start up.
 	hostConfig := &container.HostConfig{
+		NetworkMode: container.NetworkMode(networkMode),
 		Resources: container.Resources{
 			NanoCPUs:   int64(r.cfg.Container.CPULimit),
 			CpusetCpus: r.cfg.Container.CPUSet,
