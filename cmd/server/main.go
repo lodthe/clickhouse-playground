@@ -170,10 +170,11 @@ func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config
 				}
 			}
 
-			rcfg.Container = dockerengine.ContainerResources{
-				CPULimit:    uint64(r.DockerEngine.ContainerResources.CPULimit * 1e9), // cpu -> nano cpu.
-				CPUSet:      r.DockerEngine.ContainerResources.CPUSet,
-				MemoryLimit: uint64(r.DockerEngine.ContainerResources.MemoryLimitMB * 1e6), // mb -> bytes.
+			rcfg.Container = dockerengine.ContainerSettings{
+				NetworkMode: r.DockerEngine.Container.NetworkMode,
+				CPULimit:    uint64(r.DockerEngine.Container.CPULimit * 1e9), // cpu -> nano cpu.
+				CPUSet:      r.DockerEngine.Container.CPUSet,
+				MemoryLimit: uint64(r.DockerEngine.Container.MemoryLimitMB * 1e6), // mb -> bytes.
 			}
 
 			var err error

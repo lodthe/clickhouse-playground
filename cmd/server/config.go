@@ -94,7 +94,7 @@ type DockerEngine struct {
 	QuotasPath       *string         `mapstructure:"quotas_path"`
 	GC               *DockerEngineGC `mapstructure:"gc"`
 
-	ContainerResources ContainerResources `mapstructure:"container_resources"`
+	Container ContainerSettings `mapstructure:"container"`
 }
 
 type DockerEngineGC struct {
@@ -106,7 +106,8 @@ type DockerEngineGC struct {
 	ImageBufferSize       uint  `mapstructure:"image_buffer_size"`
 }
 
-type ContainerResources struct {
+type ContainerSettings struct {
+	NetworkMode   *string `mapstucture:"network_mode"`
 	CPULimit      float64 `mapstructure:"cpu_limit"`
 	CPUSet        string  `mapstructure:"cpu_cores_set"`
 	MemoryLimitMB float64 `mapstructure:"memory_limit_mb"`

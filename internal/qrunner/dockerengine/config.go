@@ -19,10 +19,12 @@ type Config struct {
 
 	StatusCollectionFrequency time.Duration
 
-	Container ContainerResources
+	Container ContainerSettings
 }
 
-type ContainerResources struct {
+type ContainerSettings struct {
+	NetworkMode *string // Network mode to use for the container.
+
 	CPULimit    uint64 // In nano cpus (1 core = 1e9 nano cpus). If 0, then unlimited.
 	CPUSet      string // A comma-separated list or hyphen-separated range of CPUs a container can use. If "", then any cores can be used.
 	MemoryLimit uint64 // In bytes. If 0, then unlimited.
@@ -64,7 +66,8 @@ var DefaultConfig = Config{
 
 	StatusCollectionFrequency: 30 * time.Second,
 
-	Container: ContainerResources{
+	Container: ContainerSettings{
+		NetworkMode: nil,
 		CPULimit:    2 * 1e9,
 		CPUSet:      "",
 		MemoryLimit: 1 * 1e9,
