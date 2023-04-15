@@ -132,7 +132,7 @@ func (p *engineProvider) removeImage(ctx context.Context, tag string, pruneChild
 	})
 }
 
-func (p *engineProvider) createContainer(ctx context.Context, config *container.Config, hostConfig *container.HostConfig) (container.ContainerCreateCreatedBody, error) {
+func (p *engineProvider) createContainer(ctx context.Context, config *container.Config, hostConfig *container.HostConfig) (container.CreateResponse, error) {
 	return p.cli.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
 }
 
