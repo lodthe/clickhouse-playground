@@ -324,7 +324,15 @@ func (r *Runner) exec(ctx context.Context, state *requestState) (stdout string, 
 		r.pipelineMetr.ExecCommand(err == nil, state.version, invokedAt)
 	}()
 
-	resp, err := r.engine.exec(ctx, state.containerID, []string{"clickhouse", "client", "-n", "-m", "--query", state.query})
+	args := []string{
+		"clickhouse", "client",
+		"-n",
+		"-m",
+		"--output_format_pretty_grid_charset", "ASCII",
+		"--output_format_pretty_color", "0",
+		"--query", state.query,
+	}
+	resp, err := r.engine.exec(ctx, state.containerID, args)
 	if err != nil {
 		return "", "", errors.Wrap(err, "exec failed")
 	}
