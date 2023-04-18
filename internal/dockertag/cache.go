@@ -3,13 +3,12 @@ package dockertag
 import (
 	"context"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-	"unicode"
 
+	"clickhouse-playground/pkg/chsemver"
 	"clickhouse-playground/pkg/dockerhub"
 
 	"github.com/pkg/errors"
@@ -293,18 +292,15 @@ func (c *Cache) sortImages(imgByTag map[string]Image) []Image {
 	sortedImages := make([]Image, 0, len(seenHeadOfList)+len(images))
 
 	// Split a tag by '.' and save this representation to use it in comparator.
-	parsed := make([][]string, len(images))
+	parsed := make([]chsemver.Semver, len(images))
 	ids := make([]int, len(images))
 	for id, img := range images {
-		parsed[id] = strings.FieldsFunc(img.Tag, func(r rune) bool {
-			return r == '.' || r == '-' || unicode.IsSpace(r)
-		})
-
+		parsed[id] = chsemver.Parse(img.Tag)
 		ids[id] = id
 	}
 
 	sort.Slice(ids, func(i, j int) bool {
-		return compareSemvers(parsed[ids[i]], parsed[ids[j]])
+		return chsemver.IsGreater(parsed[ids[i]], parsed[ids[j]])
 	})
 
 	// At first, head of list images must be added.
@@ -322,22 +318,4 @@ func (c *Cache) sortImages(imgByTag map[string]Image) []Image {
 	}
 
 	return sortedImages
-}
-
-// compareSemvers takes two splitted semver representations and compares them.
-func compareSemvers(a, b []string) bool {
-	for i := 0; i < len(a) && i < len(b); i++ {
-		numA, errA := strconv.ParseUint(a[i], 10, 64)
-		numB, errB := strconv.ParseUint(b[i], 10, 64)
-
-		if errA == nil && errB == nil {
-			if numA != numB {
-				return numA > numB
-			}
-		} else {
-			return a[i] < b[i]
-		}
-	}
-
-	return len(a) > len(b)
 }

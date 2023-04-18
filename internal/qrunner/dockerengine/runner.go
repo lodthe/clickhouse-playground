@@ -12,6 +12,7 @@ import (
 	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/metrics"
 	"clickhouse-playground/internal/qrunner"
+	"clickhouse-playground/pkg/chsemver"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -20,6 +21,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
+
+const DefaultOutputFormat = "PrettyCompactMonoBlock"
 
 type ImageStorage interface {
 	Find(version string) (dockertag.Image, bool)
@@ -318,7 +321,7 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 	return nil
 }
 
-func (r *Runner) exec(ctx context.Context, state *requestState) (stdout string, stderr string, err error) {
+func (r *Runner) execQuery(ctx context.Context, state *requestState) (stdout string, stderr string, err error) {
 	invokedAt := time.Now()
 	defer func() {
 		r.pipelineMetr.ExecCommand(err == nil, state.version, invokedAt)
@@ -328,10 +331,20 @@ func (r *Runner) exec(ctx context.Context, state *requestState) (stdout string, 
 		"clickhouse", "client",
 		"-n",
 		"-m",
-		"--output_format_pretty_grid_charset", "ASCII",
-		"--output_format_pretty_color", "0",
 		"--query", state.query,
 	}
+
+	// Inject some format options to make output prettier.
+	if !chsemver.IsGreaterRaw("20", state.version) {
+		args = append(args,
+			"--output_format_pretty_color", "0",
+			"--format", DefaultOutputFormat)
+	}
+
+	if !chsemver.IsGreaterRaw("22", state.version) {
+		args = append(args, "--output_format_pretty_grid_charset", "ASCII")
+	}
+
 	resp, err := r.engine.exec(ctx, state.containerID, args)
 	if err != nil {
 		return "", "", errors.Wrap(err, "exec failed")
@@ -372,7 +385,7 @@ func (r *Runner) runQuery(ctx context.Context, state *requestState) (output stri
 	var stderr string
 
 	for retry := 0; retry < r.cfg.MaxExecRetries; retry++ {
-		stdout, stderr, err = r.exec(ctx, state)
+		stdout, stderr, err = r.execQuery(ctx, state)
 		if err != nil {
 			return "", err
 		}
