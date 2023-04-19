@@ -39,6 +39,11 @@ func IsGreater(a, b Semver) bool {
 	return len(a) > len(b)
 }
 
-func IsGreaterRaw(a, b string) bool {
-	return IsGreater(Parse(a), Parse(b))
+// IsAtLeastMajor checks if a database version if at least the given major version.
+func IsAtLeastMajor(version, major string) bool {
+	if strings.HasPrefix(version, "head") || strings.HasPrefix(version, "latest") {
+		return true
+	}
+
+	return !IsGreater(Parse(major), Parse(version))
 }

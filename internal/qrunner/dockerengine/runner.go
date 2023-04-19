@@ -22,8 +22,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-const DefaultOutputFormat = "PrettyCompactMonoBlock"
-
 type ImageStorage interface {
 	Find(version string) (dockertag.Image, bool)
 }
@@ -335,14 +333,11 @@ func (r *Runner) execQuery(ctx context.Context, state *requestState) (stdout str
 	}
 
 	// Inject some format options to make output prettier.
-	if !chsemver.IsGreaterRaw("20", state.version) {
+	if !chsemver.IsAtLeastMajor(state.version, "21") {
 		args = append(args,
 			"--output_format_pretty_color", "0",
-			"--format", DefaultOutputFormat)
-	}
-
-	if !chsemver.IsGreaterRaw("22", state.version) {
-		args = append(args, "--output_format_pretty_grid_charset", "ASCII")
+			"--output_format_pretty_grid_charset", "ASCII",
+			"--format", r.cfg.DefaultOutputFormat)
 	}
 
 	resp, err := r.engine.exec(ctx, state.containerID, args)

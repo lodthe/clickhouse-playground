@@ -35,7 +35,8 @@ type Config struct {
 
 	API API `mapstructure:"api"`
 
-	Limits Limits `mapstructure:"limits"`
+	Settings CHSettings `mapstucture:"settings"`
+	Limits   Limits     `mapstructure:"limits"`
 
 	PrometheusExportAddress string `mapstructure:"prometheus_address"`
 
@@ -43,6 +44,10 @@ type Config struct {
 
 	Coordinator Coordinator `mapstructure:"coordinator"`
 	Runners     []Runner    `mapstructure:"runners"`
+}
+
+type CHSettings struct {
+	DefaultFormat *string `mapstructure:"default_format"`
 }
 
 type Limits struct {
