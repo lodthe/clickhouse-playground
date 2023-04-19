@@ -8,6 +8,8 @@ type Config struct {
 	ExecRetryDelay time.Duration
 	MaxExecRetries int
 
+	DefaultOutputFormat string
+
 	// Path to the xml or yaml config which will be mounted to the ../config.d/ directory.
 	CustomConfigPath *string
 
@@ -53,6 +55,8 @@ var defaultImageBufferSize = uint(30)
 var DefaultConfig = Config{
 	ExecRetryDelay: 200 * time.Millisecond,
 	MaxExecRetries: 20,
+
+	DefaultOutputFormat: "TabSeparated",
 
 	CustomConfigPath: nil,
 	QuotasPath:       nil,

@@ -160,6 +160,10 @@ func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config
 			rcfg.QuotasPath = r.DockerEngine.QuotasPath
 			rcfg.GC = nil
 
+			if config.Settings.DefaultFormat != nil {
+				rcfg.DefaultOutputFormat = *config.Settings.DefaultFormat
+			}
+
 			gc := r.DockerEngine.GC
 			if gc != nil {
 				rcfg.GC = &dockerengine.GCConfig{
