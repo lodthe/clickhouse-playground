@@ -56,7 +56,7 @@ var DefaultConfig = Config{
 	ExecRetryDelay: 200 * time.Millisecond,
 	MaxExecRetries: 20,
 
-	DefaultOutputFormat: "PrettyCompactMonoBlock",
+	DefaultOutputFormat: "TabSeparated",
 
 	CustomConfigPath: nil,
 	QuotasPath:       nil,
