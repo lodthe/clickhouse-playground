@@ -134,7 +134,7 @@ func main() {
 	shutdownCtx, shutdown := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer shutdown()
 
-	err = coord.Stop()
+	err = coord.Stop(shutdownCtx)
 	if err != nil {
 		zlog.Err(err).Msg("coordinator cannot be stopped")
 	}

@@ -81,16 +81,16 @@ func (p *engineProvider) ownershipLabelFilter() (key, value string) {
 	return "label", qrunner.LabelOwnership
 }
 
-func (p *engineProvider) pullImage(ctx context.Context, name string) (io.ReadCloser, error) {
-	return p.cli.ImagePull(ctx, name, types.ImagePullOptions{})
+func (p *engineProvider) pullImage(ctx context.Context, imageTag string) (io.ReadCloser, error) {
+	return p.cli.ImagePull(ctx, imageTag, types.ImagePullOptions{})
 }
 
 func (p *engineProvider) addImageTag(ctx context.Context, existingImageTag, newImageTag string) error {
 	return p.cli.ImageTag(ctx, existingImageTag, newImageTag)
 }
 
-func (p *engineProvider) getImageByID(ctx context.Context, name string) (types.ImageInspect, error) {
-	inspect, _, err := p.cli.ImageInspectWithRaw(ctx, name)
+func (p *engineProvider) getImageByID(ctx context.Context, id string) (types.ImageInspect, error) {
+	inspect, _, err := p.cli.ImageInspectWithRaw(ctx, id)
 
 	return inspect, err
 }
@@ -138,6 +138,14 @@ func (p *engineProvider) createContainer(ctx context.Context, config *container.
 
 func (p *engineProvider) startContainer(ctx context.Context, id string) error {
 	return p.cli.ContainerStart(ctx, id, types.ContainerStartOptions{})
+}
+
+func (p *engineProvider) pauseContainer(ctx context.Context, id string) error {
+	return p.cli.ContainerPause(ctx, id)
+}
+
+func (p *engineProvider) unpauseContainer(ctx context.Context, id string) error {
+	return p.cli.ContainerUnpause(ctx, id)
 }
 
 // exec executes the given command in the container and attaches to it.
