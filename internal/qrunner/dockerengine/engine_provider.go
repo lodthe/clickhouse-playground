@@ -177,10 +177,10 @@ func (p *engineProvider) getContainers(ctx context.Context) ([]types.Container, 
 	})
 }
 
-func (p *engineProvider) removeContainer(ctx context.Context, id string, force bool) error {
+func (p *engineProvider) removeContainer(ctx context.Context, id string) error {
 	return p.cli.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
 		RemoveVolumes: true,
-		Force:         force,
+		Force:         true,
 	})
 }
 

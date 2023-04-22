@@ -96,7 +96,7 @@ func (p *prewarmer) Stop(shutdownCtx context.Context) {
 	p.logger.Info().Int("count", len(p.containers)).Msg("start removing prewarmed containers")
 
 	for _, c := range p.containers {
-		err := p.engine.removeContainer(shutdownCtx, c.id, true)
+		err := p.engine.removeContainer(shutdownCtx, c.id)
 		if err != nil {
 			p.logger.Err(err).Str("container_id", c.id).Msg("failed to remove container")
 		} else {
@@ -207,7 +207,7 @@ func (p *prewarmer) ejectContainer() {
 		Msg("a container has been ejected from the prewarmed set")
 
 	go func() {
-		err := p.engine.removeContainer(p.ctx, container.id, true)
+		err := p.engine.removeContainer(p.ctx, container.id)
 		if err != nil {
 			p.logger.Err(err).Str("container_id", container.id).Msg("failed to remove container")
 		}

@@ -138,7 +138,7 @@ func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint6
 			continue
 		}
 
-		err = g.engine.removeContainer(g.ctx, c.ID, true)
+		err = g.engine.removeContainer(g.ctx, c.ID)
 		if err != nil {
 			g.logger.Error().Err(err).Str("container_id", c.ID).Msg("containers gc failed to remove container")
 			continue
