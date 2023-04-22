@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const DatabaseInitializationTime = 1 * time.Second
+
 type containerRunner interface {
 	createContainer(ctx context.Context, state *requestState) error
 }
@@ -163,6 +165,9 @@ func (p *prewarmer) runContainer(request *requestState) error {
 
 	// Pause container after some time to allow its bootstrap.
 	go func() {
+		// Sleep is necessary for database server bootstrap to be finished.
+		time.Sleep(DatabaseInitializationTime)
+
 		release := container.acquireLock()
 		defer release()
 
