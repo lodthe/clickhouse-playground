@@ -134,7 +134,7 @@ func main() {
 	shutdownCtx, shutdown := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer shutdown()
 
-	err = coord.Stop()
+	err = coord.Stop(shutdownCtx)
 	if err != nil {
 		zlog.Err(err).Msg("coordinator cannot be stopped")
 	}
@@ -179,6 +179,10 @@ func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config
 				CPULimit:    uint64(r.DockerEngine.Container.CPULimit * 1e9), // cpu -> nano cpu.
 				CPUSet:      r.DockerEngine.Container.CPUSet,
 				MemoryLimit: uint64(r.DockerEngine.Container.MemoryLimitMB * 1e6), // mb -> bytes.
+			}
+
+			if r.DockerEngine.Prewarm != nil && r.DockerEngine.Prewarm.MaxWarmContainers != nil {
+				rcfg.MaxWarmContainers = *r.DockerEngine.Prewarm.MaxWarmContainers
 			}
 
 			var err error

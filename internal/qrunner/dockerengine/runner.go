@@ -43,9 +43,10 @@ type Runner struct {
 	tagStorage   ImageStorage
 	pipelineMetr *metrics.PipelineExporter
 
-	workers sync.WaitGroup
-	gc      *garbageCollector
-	status  *statusCollector
+	workers   sync.WaitGroup
+	gc        *garbageCollector
+	status    *statusCollector
+	prewarmer *prewarmer
 }
 
 func New(ctx context.Context, logger zerolog.Logger, name string, cfg Config, tagStorage ImageStorage) (*Runner, error) {
@@ -57,10 +58,8 @@ func New(ctx context.Context, logger zerolog.Logger, name string, cfg Config, ta
 	ctx, cancel := context.WithCancel(ctx)
 
 	logger = logger.With().Str("runner", name).Logger()
-	gc := newGarbageCollector(ctx, logger, cfg.GC, engine, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name))
-	status := newStatusCollector(ctx, logger, cfg.StatusCollectionFrequency, engine, metrics.NewRunnerStatusExporter(string(qrunner.TypeDockerEngine), name))
 
-	return &Runner{
+	runner := &Runner{
 		ctx:          ctx,
 		cancel:       cancel,
 		logger:       logger,
@@ -69,9 +68,13 @@ func New(ctx context.Context, logger zerolog.Logger, name string, cfg Config, ta
 		engine:       engine,
 		tagStorage:   tagStorage,
 		pipelineMetr: metrics.NewPipelineExporter(string(qrunner.TypeDockerEngine), name),
-		gc:           gc,
-		status:       status,
-	}, nil
+	}
+
+	runner.gc = newGarbageCollector(ctx, logger, cfg.GC, engine, metrics.NewRunnerGCExporter(string(qrunner.TypeDockerEngine), name))
+	runner.status = newStatusCollector(ctx, logger, cfg.StatusCollectionFrequency, engine, metrics.NewRunnerStatusExporter(string(qrunner.TypeDockerEngine), name))
+	runner.prewarmer = newPrewarmer(ctx, logger, runner, runner.engine, cfg.MaxWarmContainers)
+
+	return runner, nil
 }
 
 func (r *Runner) Type() qrunner.Type {
@@ -107,6 +110,12 @@ func (r *Runner) Start() error {
 		r.status.start()
 	}()
 
+	r.workers.Add(1)
+	go func() {
+		defer r.workers.Done()
+		r.prewarmer.Start()
+	}()
+
 	logCtx := r.logger.Info()
 	if r.cfg.DaemonURL != nil {
 		logCtx = logCtx.Str("daemon_url", *r.cfg.DaemonURL)
@@ -116,8 +125,10 @@ func (r *Runner) Start() error {
 	return nil
 }
 
-func (r *Runner) Stop() error {
+func (r *Runner) Stop(shutdownCtx context.Context) error {
 	r.logger.Info().Msg("stopping")
+
+	r.prewarmer.Stop(shutdownCtx)
 
 	r.cancel()
 	r.workers.Wait()
@@ -127,22 +138,32 @@ func (r *Runner) Stop() error {
 	return nil
 }
 
-func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
+func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (output string, err error) {
 	state := &requestState{
 		runID:   runID,
 		version: version,
 		query:   query,
 	}
 
-	err := r.pull(ctx, state)
+	state.imageTag, state.imageFQN, err = r.constructImageFQN(state.version)
 	if err != nil {
-		return "", errors.Wrap(err, "pull failed")
+		return "", fmt.Errorf("failed to construct FQN: %w", err)
 	}
 
-	err = r.runContainer(ctx, state)
+	containerID, found, err := r.prewarmer.Fetch(state.imageFQN)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to run container")
+		r.logger.Err(err).Str("run_id", runID).Msg("failed to fetch a prewarmed container")
 	}
+	if found {
+		state.containerID = containerID
+	} else {
+		err := r.createContainer(ctx, state)
+		if err != nil {
+			return "", fmt.Errorf("failed to create container: %w", err)
+		}
+	}
+
+	r.prewarmer.PushNewRequest(*state)
 
 	done := make(chan struct{})
 	defer close(done)
@@ -167,7 +188,7 @@ func (r *Runner) RunQuery(ctx context.Context, runID string, query string, versi
 		r.logger.Debug().Str("container_id", state.containerID).Msg("container has been force removed")
 	}()
 
-	output, err := r.runQuery(ctx, state)
+	output, err = r.runQuery(ctx, state)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to run query")
 	}
@@ -175,23 +196,56 @@ func (r *Runner) RunQuery(ctx context.Context, runID string, query string, versi
 	return output, nil
 }
 
+// constructImageFQN builds image tag and FQN from version.
+// If there is no such a version, an error is returned.
+//
+// Otherwise, an image is fetched and the following names are built:
+// - image tag: image name in format <repository>:<version>
+// - image FQN: a unique fully qualified name that includes the exact version of the image
+func (r *Runner) constructImageFQN(version string) (imageTag string, imageFQN string, err error) {
+	img, found := r.tagStorage.Find(version)
+	if !found {
+		return "", "", errors.New("version not found")
+	}
+
+	imageTag = qrunner.FullImageName(img.Repository, version)
+	imageFQN = qrunner.PlaygroundImageName(img.Repository, img.Digest)
+
+	return imageTag, imageFQN, nil
+}
+
+// createContainer pulls image if necessary and runs a container with a database.
+func (r *Runner) createContainer(ctx context.Context, state *requestState) error {
+	if state.imageFQN == "" || state.imageTag == "" {
+		var err error
+		state.imageTag, state.imageFQN, err = r.constructImageFQN(state.version)
+		if err != nil {
+			return fmt.Errorf("failed to construct FQN: %w", err)
+		}
+	}
+
+	err := r.pull(ctx, state)
+	if err != nil {
+		return fmt.Errorf("pull failed: %w", err)
+	}
+
+	err = r.runContainer(ctx, state)
+	if err != nil {
+		return fmt.Errorf("container run failed: %w", err)
+	}
+
+	return err
+}
+
 // pull checks whether the requested image exists. If no, it will be downloaded and renamed to hashed-name.
 func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 	startedAt := time.Now()
-
-	img, found := r.tagStorage.Find(state.version)
-	if !found {
-		return errors.New("version not found")
-	}
-
-	imageName := qrunner.FullImageName(img.Repository, state.version)
-	state.chpImageName = qrunner.PlaygroundImageName(img.Repository, img.Digest)
 
 	if r.checkIfImageExists(ctx, state) {
 		return nil
 	}
 
-	out, err := r.engine.pullImage(ctx, imageName)
+	out, err := r.engine.pullImage(ctx, state.imageTag)
 	if err != nil {
 		r.pipelineMetr.PullNewImage(false, state.version, startedAt)
 		return errors.Wrap(err, "docker pull failed")
@@ -200,18 +254,18 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 	// We should read the output to be sure that the image has been pulled.
 	_, err = io.ReadAll(out)
 	if err != nil {
-		r.logger.Error().Err(err).Str("image", imageName).Msg("failed to read pull output")
+		r.logger.Error().Err(err).Str("image", state.imageTag).Msg("failed to read pull output")
 	}
 
-	r.logger.Debug().Str("image", imageName).Msg("base image has been pulled")
+	r.logger.Debug().Str("image", state.imageTag).Msg("base image has been pulled")
 
-	err = r.engine.addImageTag(ctx, imageName, state.chpImageName)
+	err = r.engine.addImageTag(ctx, state.imageTag, state.imageFQN)
 	if err != nil {
 		r.pipelineMetr.PullNewImage(false, state.version, startedAt)
 		r.logger.Error().Err(err).
 			Str("run_id", state.runID).
-			Str("source", imageName).
-			Str("target", state.chpImageName).
+			Str("source", state.imageTag).
+			Str("target", state.imageFQN).
 			Msg("failed to rename image")
 
 		return errors.Wrap(err, "failed to tag image")
@@ -221,7 +275,7 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 	r.logger.Debug().
 		Str("run_id", state.runID).
 		Dur("elapsed_ms", time.Since(startedAt)).
-		Str("image", imageName).
+		Str("image", state.imageTag).
 		Msg("image has been pulled")
 
 	return nil
@@ -230,19 +284,19 @@ func (r *Runner) pull(ctx context.Context, state *requestState) (err error) {
 func (r *Runner) checkIfImageExists(ctx context.Context, state *requestState) bool {
 	startedAt := time.Now()
 
-	_, err := r.engine.getImageByID(ctx, state.chpImageName)
+	_, err := r.engine.getImageByID(ctx, state.imageFQN)
 	if err == nil {
 		r.pipelineMetr.PullExistedImage(true, state.version, startedAt)
 		r.logger.Debug().
 			Dur("elapsed_ms", time.Since(startedAt)).
-			Str("image", state.chpImageName).
+			Str("image", state.imageFQN).
 			Msg("image has already been pulled")
 
 		return true
 	}
 	if err != nil && !dockercli.IsErrNotFound(err) {
 		r.pipelineMetr.PullExistedImage(false, state.version, startedAt)
-		r.logger.Error().Err(err).Str("image", state.chpImageName).Msg("docker inspect failed")
+		r.logger.Error().Err(err).Str("image", state.imageFQN).Msg("docker inspect failed")
 	}
 
 	return false
@@ -256,7 +310,7 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 	}()
 
 	contConfig := &container.Config{
-		Image:  state.chpImageName,
+		Image:  state.imageFQN,
 		Labels: qrunner.CreateContainerLabels(state.runID, state.version),
 	}
 
@@ -303,7 +357,7 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 	createdAt := time.Now()
 	debugLogger := r.logger.Debug().
 		Str("run_id", state.runID).
-		Str("image", state.chpImageName).
+		Str("image", state.imageFQN).
 		Str("container_id", cont.ID)
 	debugLogger.Dur("elapsed_ms", time.Since(invokedAt)).Msg("container has been created")
 

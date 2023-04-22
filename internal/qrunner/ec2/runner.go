@@ -66,7 +66,7 @@ func (r *Runner) Start() error {
 	return nil
 }
 
-func (r *Runner) Stop() error {
+func (r *Runner) Stop(_ context.Context) error {
 	r.cancel()
 
 	return nil

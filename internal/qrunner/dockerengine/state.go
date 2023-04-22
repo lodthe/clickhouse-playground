@@ -7,6 +7,11 @@ type requestState struct {
 	version string
 	query   string
 
-	chpImageName string
-	containerID  string
+	// <repository>:<version>
+	imageTag string
+
+	// a unique name that refers the image
+	imageFQN string
+
+	containerID string
 }

@@ -17,5 +17,5 @@ type Runner interface {
 	Start() error
 
 	// Stop stops background tasks and waits for their finish.
-	Stop() error
+	Stop(shutdownCtx context.Context) error
 }

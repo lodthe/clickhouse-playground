@@ -19,6 +19,7 @@ type Config struct {
 
 	GC *GCConfig
 
+	MaxWarmContainers         uint
 	StatusCollectionFrequency time.Duration
 
 	Container ContainerSettings
@@ -68,6 +69,7 @@ var DefaultConfig = Config{
 		ImageBufferSize:       defaultImageBufferSize,
 	},
 
+	MaxWarmContainers:         5,
 	StatusCollectionFrequency: 30 * time.Second,
 
 	Container: ContainerSettings{

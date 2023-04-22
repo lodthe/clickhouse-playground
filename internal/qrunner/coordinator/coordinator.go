@@ -145,7 +145,7 @@ func (c *Coordinator) loopCheckLiveness(r *Runner) {
 }
 
 // Stop stops underlying runners and waits for the health checks to be finished.
-func (c *Coordinator) Stop() error {
+func (c *Coordinator) Stop(shutdownCtx context.Context) error {
 	c.cancel()
 
 	c.logger.Info().Msg("stopping coordinator")
@@ -155,7 +155,7 @@ func (c *Coordinator) Stop() error {
 			continue
 		}
 
-		err := r.underlying.Stop()
+		err := r.underlying.Stop(shutdownCtx)
 		if err != nil {
 			c.logger.Err(err).Str("underlying", r.underlying.Name()).Msg("runner cannot be stopped")
 		}

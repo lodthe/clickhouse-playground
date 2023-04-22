@@ -155,3 +155,9 @@ runners:
         # Docker cli: docker run --memory=1000m
         # Default: unlimited.
         memory_limit_mb: 1000
+
+      # [OPTIONAL] You can configure the prewarmer component that starts containers
+      # in advance to optimize the process time.
+      prewarm:
+        # [OPTIONAL] Maximum number of prewarmed containers per worker.
+        max_warm_containers: 5
