@@ -111,19 +111,19 @@ func (p *prewarmer) Stop(shutdownCtx context.Context) {
 
 // extractNextRequest extracts the next request and
 // the number of requests in the queue, waiting to be processed.
-func (p *prewarmer) extractNextRequest() (requestState, int) {
+func (p *prewarmer) extractNextRequest() (request requestState, count int) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	cnt := len(p.latestRequestsQueue)
-	if cnt == 0 {
+	count = len(p.latestRequestsQueue)
+	if count == 0 {
 		return requestState{}, 0
 	}
 
-	req := p.latestRequestsQueue[0]
+	request = p.latestRequestsQueue[0]
 	p.latestRequestsQueue = p.latestRequestsQueue[1:]
 
-	return req, cnt
+	return request, count
 }
 
 func (p *prewarmer) runContainer(request *requestState) error {
