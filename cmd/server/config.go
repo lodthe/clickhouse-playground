@@ -98,6 +98,7 @@ type DockerEngine struct {
 	CustomConfigPath *string         `mapstructure:"custom_config_path"`
 	QuotasPath       *string         `mapstructure:"quotas_path"`
 	GC               *DockerEngineGC `mapstructure:"gc"`
+	Prewarm          *Prewarm        `mapsctucture:"prewarm"`
 
 	Container ContainerSettings `mapstructure:"container"`
 }
@@ -109,6 +110,10 @@ type DockerEngineGC struct {
 
 	ImageGCCountThreshold *uint `mapstructure:"image_count_threshold"`
 	ImageBufferSize       uint  `mapstructure:"image_buffer_size"`
+}
+
+type Prewarm struct {
+	MaxWarmContainers *uint `mapstructure:"max_warm_containers"`
 }
 
 type ContainerSettings struct {

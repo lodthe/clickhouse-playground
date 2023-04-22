@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-const PausedHardDeadline = 24 * time.Hour
+const PausedContainersMaxTTL = 24 * time.Hour
 
 type garbageCollector struct {
 	ctx context.Context
@@ -134,7 +134,7 @@ func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint6
 			continue
 		}
 
-		if c.Status == "paused" && time.Since(createdAt) < PausedHardDeadline {
+		if c.State == "paused" && time.Since(createdAt) < PausedContainersMaxTTL {
 			continue
 		}
 

@@ -181,6 +181,10 @@ func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config
 				MemoryLimit: uint64(r.DockerEngine.Container.MemoryLimitMB * 1e6), // mb -> bytes.
 			}
 
+			if r.DockerEngine.Prewarm != nil && r.DockerEngine.Prewarm.MaxWarmContainers != nil {
+				rcfg.MaxWarmContainers = *r.DockerEngine.Prewarm.MaxWarmContainers
+			}
+
 			var err error
 			runner, err = dockerengine.New(ctx, logger, r.Name, rcfg, tagStorage)
 			if err != nil {
