@@ -160,4 +160,4 @@ runners:
       # in advance to optimize the process time.
       prewarm:
         # [OPTIONAL] Maximum number of prewarmed containers per worker.
-        max_warm_containers: 2
+        max_warm_containers: 5
