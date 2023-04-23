@@ -286,6 +286,8 @@ func (p *prewarmer) unpauseIfNecessary(c *containerState) error {
 	release := c.acquireLock()
 	defer release()
 
+	defer c.setStatus(statusFetched)
+
 	if c.status == statusRunning {
 		return nil
 	}
@@ -296,8 +298,6 @@ func (p *prewarmer) unpauseIfNecessary(c *containerState) error {
 	}
 
 	p.logger.Debug().Str("id", c.id).Str("image", c.imageFQN).Msg("container has been unpaused")
-
-	c.setStatus(statusFetched)
 
 	return nil
 }
