@@ -12,7 +12,6 @@ import (
 	"clickhouse-playground/internal/qrunner"
 	"clickhouse-playground/internal/qrunner/coordinator"
 	"clickhouse-playground/internal/qrunner/dockerengine"
-	"clickhouse-playground/internal/qrunner/ec2"
 	"clickhouse-playground/internal/queryrun"
 	"clickhouse-playground/pkg/dockerhub"
 	api "clickhouse-playground/pkg/restapi"
@@ -150,9 +149,6 @@ func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config
 	for _, r := range config.Runners {
 		var runner qrunner.Runner
 		switch r.Type {
-		case RunnerTypeEC2:
-			runner = ec2.New(ctx, logger, r.Name, ec2.DefaultConfig, awsConfig, r.EC2.InstanceID)
-
 		case RunnerTypeDockerEngine:
 			rcfg := dockerengine.DefaultConfig
 			rcfg.DaemonURL = r.DockerEngine.DaemonURL
@@ -192,7 +188,7 @@ func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config
 			}
 
 		default:
-			zlog.Fatal().Msg("invalid runner")
+			zlog.Fatal().Msg("invalid runner type")
 		}
 
 		runners = append(runners, coordinator.NewRunner(runner, r.Weight, r.MaxConcurrency))
