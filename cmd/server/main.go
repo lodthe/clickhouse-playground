@@ -16,7 +16,6 @@ import (
 	"clickhouse-playground/pkg/dockerhub"
 	api "clickhouse-playground/pkg/restapi"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconf "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -73,7 +72,7 @@ func main() {
 	tagStorage.RunBackgroundUpdate()
 
 	// Create runners and the coordinator.
-	runners := initializeRunners(ctx, config, awsConfig, tagStorage, logger)
+	runners := initializeRunners(ctx, config, tagStorage, logger)
 
 	coordinatorCfg := coordinator.Config{
 		HealthChecksEnabled:   true,
@@ -144,7 +143,7 @@ func main() {
 	}
 }
 
-func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config, tagStorage *dockertag.Cache, logger zerolog.Logger) []*coordinator.Runner {
+func initializeRunners(ctx context.Context, config *Config, tagStorage *dockertag.Cache, logger zerolog.Logger) []*coordinator.Runner {
 	var runners []*coordinator.Runner
 	for _, r := range config.Runners {
 		var runner qrunner.Runner
