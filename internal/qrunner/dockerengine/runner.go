@@ -387,7 +387,7 @@ func (r *Runner) execQuery(ctx context.Context, state *requestState) (stdout str
 	}
 
 	// Inject some format options to make output prettier.
-	if !chsemver.IsAtLeastMajor(state.version, "21") {
+	if chsemver.IsAtLeastMajor(state.version, "21") {
 		args = append(args,
 			"--output_format_pretty_color", "0",
 			"--output_format_pretty_grid_charset", "ASCII",

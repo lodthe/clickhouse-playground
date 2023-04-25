@@ -1,6 +1,7 @@
 package chsemver
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,6 +41,51 @@ func TestParse(t *testing.T) {
 	for _, test := range cases {
 		t.Run(test.Input, func(t *testing.T) {
 			assert.EqualValues(t, Parse(test.Input), test.Expected)
+		})
+	}
+}
+
+func TestIsAtLeastMajor(t *testing.T) {
+	cases := []struct {
+		Version  string
+		Major    string
+		Expected bool
+	}{
+		{
+			Version:  "1",
+			Major:    "21",
+			Expected: false,
+		},
+		{
+			Version:  "1",
+			Major:    "21.1",
+			Expected: false,
+		},
+		{
+			Version:  "1.28",
+			Major:    "21",
+			Expected: false,
+		},
+		{
+			Version:  "9.11",
+			Major:    "10",
+			Expected: false,
+		},
+		{
+			Version:  "21.32",
+			Major:    "20",
+			Expected: true,
+		},
+		{
+			Version:  "21",
+			Major:    "21",
+			Expected: true,
+		},
+	}
+
+	for _, test := range cases {
+		t.Run(fmt.Sprintf("%s >= %s?", test.Version, test.Major), func(t *testing.T) {
+			assert.EqualValues(t, IsAtLeastMajor(test.Version, test.Major), test.Expected)
 		})
 	}
 }

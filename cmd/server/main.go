@@ -16,7 +16,6 @@ import (
 	"clickhouse-playground/pkg/dockerhub"
 	api "clickhouse-playground/pkg/restapi"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconf "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -32,10 +31,6 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-	// Basic logging preparation.
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
 	// Initialize config.
 	config, err := LoadConfig()
 	if err != nil {
@@ -43,6 +38,11 @@ func main() {
 	}
 
 	// Initialize logger.
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+	if config.LogFormat == PrettyLogFormat {
+		zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	}
+
 	lvl, err := zerolog.ParseLevel(config.LogLevel)
 	if err != nil {
 		zlog.Fatal().Err(err).Msg("invalid log level")
@@ -73,7 +73,7 @@ func main() {
 	tagStorage.RunBackgroundUpdate()
 
 	// Create runners and the coordinator.
-	runners := initializeRunners(ctx, config, awsConfig, tagStorage, logger)
+	runners := initializeRunners(ctx, config, tagStorage, logger)
 
 	coordinatorCfg := coordinator.Config{
 		HealthChecksEnabled:   true,
@@ -144,7 +144,7 @@ func main() {
 	}
 }
 
-func initializeRunners(ctx context.Context, config *Config, awsConfig aws.Config, tagStorage *dockertag.Cache, logger zerolog.Logger) []*coordinator.Runner {
+func initializeRunners(ctx context.Context, config *Config, tagStorage *dockertag.Cache, logger zerolog.Logger) []*coordinator.Runner {
 	var runners []*coordinator.Runner
 	for _, r := range config.Runners {
 		var runner qrunner.Runner
