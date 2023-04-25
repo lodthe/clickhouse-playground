@@ -56,7 +56,7 @@ coordinator:
 
 runners:
   # You can specify several runners. The coordinator will load balance incoming queries among them.
-  - # Available types: EC2, DOCKER_ENGINE.
+  - # Available types: DOCKER_ENGINE.
     type: DOCKER_ENGINE
     name: default
 
@@ -68,11 +68,6 @@ runners:
     # If the weight of r1 is 10 times the weight of r2, r1 is selected 10 times more often.
     # Default: 100.
     weight: 100
-
-    # Required if type is EC2.
-    ec2:
-      # AWS EC2 instance id used to run queries.
-      instance_id: i-023c5bb002bb45ad4
 
     # Required if type is DOCKER_ENGINE.
     docker_engine:

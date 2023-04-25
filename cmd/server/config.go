@@ -24,7 +24,6 @@ const DefaultMaxOutputLength = 25000
 type RunnerType string
 
 const (
-	RunnerTypeEC2          RunnerType = "EC2"
 	RunnerTypeDockerEngine RunnerType = "DOCKER_ENGINE"
 )
 
@@ -85,12 +84,7 @@ type Runner struct {
 	Weight         uint       `mapstructure:"weight"`
 	MaxConcurrency *uint32    `mapstructure:"max_concurrency"`
 
-	EC2          *EC2          `mapstructure:"ec2"`
 	DockerEngine *DockerEngine `mapstructure:"docker_engine"`
-}
-
-type EC2 struct {
-	InstanceID string `mapstructure:"instance_id"`
 }
 
 type DockerEngine struct {
@@ -138,14 +132,6 @@ func (r *Runner) Validate() error {
 	}
 
 	switch r.Type {
-	case RunnerTypeEC2:
-		if r.EC2 == nil {
-			return errors.Errorf("[%s] runner.ec2 is required when runner.type is EC2", r.Name)
-		}
-		if r.EC2.InstanceID == "" {
-			return errors.New("runner.ec2.instance_id is required when runner.type is EC2")
-		}
-
 	case RunnerTypeDockerEngine:
 		gc := r.DockerEngine.GC
 		if gc == nil {
@@ -165,7 +151,7 @@ func (r *Runner) Validate() error {
 		return errors.Errorf("[%s] runner.type is required", r.Name)
 
 	default:
-		return errors.Errorf("unknown runner %s type %s (supported: %s, %s)", r.Name, r.Type, RunnerTypeEC2, RunnerTypeDockerEngine)
+		return errors.Errorf("unknown runner %s type %s (supported: %s)", r.Name, r.Type, RunnerTypeDockerEngine)
 	}
 
 	return nil
