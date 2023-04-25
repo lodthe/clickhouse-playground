@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -27,8 +28,16 @@ const (
 	RunnerTypeDockerEngine RunnerType = "DOCKER_ENGINE"
 )
 
+type LogFormat string
+
+const (
+	PrettyLogFormat LogFormat = "pretty"
+	JSONLogFormat   LogFormat = "json"
+)
+
 type Config struct {
-	LogLevel string `mapstructure:"log_level"`
+	LogLevel  string    `mapstructure:"log_level"`
+	LogFormat LogFormat `mapstructure:"log_format"`
 
 	DockerImage DockerImage `mapstructure:"docker_image"`
 
@@ -199,6 +208,16 @@ func LoadConfig() (*Config, error) {
 func (c *Config) validate() error {
 	if c.LogLevel == "" {
 		c.LogLevel = "debug"
+	}
+
+	switch c.LogFormat {
+	case "":
+		c.LogFormat = JSONLogFormat
+
+	case JSONLogFormat, PrettyLogFormat:
+
+	default:
+		return fmt.Errorf("invalid log format (available: %s, %s)", JSONLogFormat, PrettyLogFormat)
 	}
 
 	if len(c.DockerImage.Repositories) == 0 {

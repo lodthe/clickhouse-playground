@@ -31,10 +31,6 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-	// Basic logging preparation.
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
 	// Initialize config.
 	config, err := LoadConfig()
 	if err != nil {
@@ -42,6 +38,11 @@ func main() {
 	}
 
 	// Initialize logger.
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+	if config.LogFormat == PrettyLogFormat {
+		zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	}
+
 	lvl, err := zerolog.ParseLevel(config.LogLevel)
 	if err != nil {
 		zlog.Fatal().Err(err).Msg("invalid log level")
