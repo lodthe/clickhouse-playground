@@ -127,6 +127,7 @@ func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint6
 		return count, spaceReclaimed, errors.Wrap(err, "failed to list containers")
 	}
 
+	var pausedContainers uint
 	for _, c := range containers {
 		createdAt := time.Unix(c.Created, 0)
 		deadline := createdAt.Add(*g.cfg.ContainerTTL)
@@ -134,8 +135,11 @@ func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint6
 			continue
 		}
 
-		if c.State == "paused" && time.Since(createdAt) < PausedContainersMaxTTL {
-			continue
+		if c.State == "paused" {
+			pausedContainers++
+			if time.Since(createdAt) < PausedContainersMaxTTL {
+				continue
+			}
 		}
 
 		err = g.engine.removeContainer(g.ctx, c.ID)
@@ -149,6 +153,8 @@ func (g *garbageCollector) collectContainers() (count uint, spaceReclaimed uint6
 		count++
 		spaceReclaimed += uint64(c.SizeRw)
 	}
+
+	g.metr.ReportPausedContainers(pausedContainers)
 
 	return count, spaceReclaimed, nil
 }

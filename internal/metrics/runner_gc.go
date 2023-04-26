@@ -7,6 +7,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+type RunnerGCExporter struct {
+	duration         *prometheus.HistogramVec
+	objCollected     *prometheus.CounterVec
+	spaceReclaimed   *prometheus.CounterVec
+	pausedContainers prometheus.Gauge
+}
+
 func NewRunnerGCExporter(runnerType, runnerName string) *RunnerGCExporter {
 	runnerLabels := prometheus.Labels{
 		"runner_type": runnerType,
@@ -42,13 +49,15 @@ func NewRunnerGCExporter(runnerType, runnerName string) *RunnerGCExporter {
 			},
 			[]string{"object"},
 		),
+		pausedContainers: promauto.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace:   "runner",
+				Name:        "paused_containers",
+				Help:        "Number of prewarmed containers at the moment.",
+				ConstLabels: runnerLabels,
+			},
+		),
 	}
-}
-
-type RunnerGCExporter struct {
-	duration       *prometheus.HistogramVec
-	objCollected   *prometheus.CounterVec
-	spaceReclaimed *prometheus.CounterVec
 }
 
 func (r *RunnerGCExporter) objectsCollected(object string, count uint, spaceReclaimed uint64, startedAt time.Time) {
@@ -65,4 +74,8 @@ func (r *RunnerGCExporter) ContainersCollected(count uint, spaceReclaimed uint64
 
 func (r *RunnerGCExporter) ImagesCollected(count uint, spaceReclaimed uint64, startedAt time.Time) {
 	r.objectsCollected("image", count, spaceReclaimed, startedAt)
+}
+
+func (r *RunnerGCExporter) ReportPausedContainers(count uint) {
+	r.pausedContainers.Set(float64(count))
 }
