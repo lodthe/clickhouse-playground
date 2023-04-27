@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"time"
 
 	"clickhouse-playground/internal/qrunner"
 
@@ -14,6 +15,8 @@ import (
 	dockercli "github.com/docker/docker/client"
 	"github.com/pkg/errors"
 )
+
+const DefaultDockerTimeout = 5 * time.Minute
 
 // engineProvider simplifies communication with Docker Engine API.
 type engineProvider struct {
@@ -41,6 +44,7 @@ func newProvider(ctx context.Context, daemonURL *string) (*engineProvider, error
 func getDockerEngineOpts(daemonURL *string) ([]dockercli.Opt, error) {
 	opts := []dockercli.Opt{
 		dockercli.WithAPIVersionNegotiation(),
+		dockercli.WithTimeout(DefaultDockerTimeout),
 	}
 
 	if daemonURL == nil {
