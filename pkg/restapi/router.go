@@ -12,22 +12,34 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/rs/zerolog"
 )
 
 type RouterOpts struct {
-	DockerRepository string
+	Logger     zerolog.Logger
+	Runner     QueryRunner
+	TagStorage TagStorage
+	RunRepo    queryrun.Repository
+
+	Timeout time.Duration
+
+	MaxQueryLength  uint64
+	MaxOutputLength uint64
 }
 
-func NewRouter(timeout time.Duration, runner QueryRunner, tagStorage TagStorage, runRepo queryrun.Repository, maxQueryLength, maxOutputLength uint64) http.Handler {
+func NewRouter(opts RouterOpts) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(metricsMiddleware)
 
 	r.Use(middleware.RequestID)
-	r.Use(middleware.Logger)
+	r.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
+		Logger:  &opts.Logger,
+		NoColor: true,
+	}))
 	r.Use(middleware.Recoverer)
 
-	r.Use(middleware.Timeout(timeout))
+	r.Use(middleware.Timeout(opts.Timeout))
 
 	r.Use(cors.Handler(cors.Options{
 		// AllowedOrigins:   []string{"https://foo.com"}, // Use this to allow specific origin hosts
@@ -40,8 +52,8 @@ func NewRouter(timeout time.Duration, runner QueryRunner, tagStorage TagStorage,
 	}))
 
 	r.Route("/api", func(r chi.Router) {
-		newQueryHandler(runner, runRepo, tagStorage, maxQueryLength, maxOutputLength).handle(r)
-		newImageTagHandler(tagStorage).handle(r)
+		newQueryHandler(opts.Runner, opts.RunRepo, opts.TagStorage, opts.MaxQueryLength, opts.MaxOutputLength).handle(r)
+		newImageTagHandler(opts.TagStorage).handle(r)
 	})
 
 	return r
