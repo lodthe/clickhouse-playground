@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"sync"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -10,25 +12,32 @@ type PrewarmerExporter struct {
 	containersSetUpdates *prometheus.CounterVec
 }
 
+var prewarmerInit sync.Once
+var prewarmerExporter *PrewarmerExporter
+
 func NewPrewarmerExporter() *PrewarmerExporter {
-	return &PrewarmerExporter{
-		fetchesTotal: promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Namespace: "prewarmer",
-				Name:      "fetch_requests_total",
-				Help:      "How many fetch requests were dispatched.",
-			},
-			[]string{"status"},
-		),
-		containersSetUpdates: promauto.NewCounterVec(
-			prometheus.CounterOpts{
-				Namespace: "prewarmer",
-				Name:      "containers_set_updates_total",
-				Help:      "How many changes of containers set are done.",
-			},
-			[]string{"action"},
-		),
-	}
+	prewarmerInit.Do(func() {
+		prewarmerExporter = &PrewarmerExporter{
+			fetchesTotal: promauto.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: "prewarmer",
+					Name:      "fetch_requests_total",
+					Help:      "How many fetch requests were dispatched.",
+				},
+				[]string{"status"},
+			),
+			containersSetUpdates: promauto.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: "prewarmer",
+					Name:      "containers_set_updates_total",
+					Help:      "How many changes of containers set are done.",
+				},
+				[]string{"action"},
+			),
+		}
+	})
+
+	return prewarmerExporter
 }
 
 func (r *PrewarmerExporter) FetchHit() {
