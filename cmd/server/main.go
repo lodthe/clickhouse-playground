@@ -50,23 +50,18 @@ func main() {
 
 	zlog.Logger = zlog.Logger.Level(lvl)
 	logger := zlog.Logger
-	
-	var awsConfig aws.Config
 
-	if (config.AWS.AccessKeyID != "")
-	// Load AWS config with credentials when AccessKeyID is not empty
-		awsConfig, err = awsconf.LoadDefaultConfig(
-			ctx,
-			awsconf.WithCredentialsProvider(config),
-			awsconf.WithRegion(config.AWS.Region),
-		)
-	else {
-	// Load AWS config with region only when AccessKeyID is empty and let SDK to pick credentials from available sources
-		awsConfig, err = awsconf.LoadDefaultConfig(
-			ctx,
-			awsconf.WithRegion(config.AWS.Region),
-		)
+	// Load AWS credentials.
+	var awsOpts []func(*awsconf.LoadOptions) error
+	if config.AWS.AccessKeyID != "" {
+		// Load AWS config with credentials when AccessKeyID is not empty.
+		// Otherwise, we let SDK to pick credentials from available sources automatically.
+		awsOpts = append(awsOpts, awsconf.WithCredentialsProvider(config))
 	}
+
+	awsOpts = append(awsOpts, awsconf.WithRegion(config.AWS.Region))
+
+	awsConfig, err := awsconf.LoadDefaultConfig(ctx, awsOpts...)
 	if err != nil {
 		zlog.Fatal().Err(err).Msg("failed to load AWS config")
 	}
