@@ -1,7 +1,7 @@
 # Dockerfile was generated from
 # https://github.com/lodthe/dockerfiles/blob/main/go/Dockerfile
 
-FROM golang:1.19-alpine3.16 AS builder
+FROM golang:1.21.3-alpine3.18 AS builder
 
 # Setup base software for building an app.
 RUN apk update && \
@@ -20,7 +20,7 @@ COPY . .
 RUN go build -o bin/application cmd/server/*
 
 # Prepare executor image.
-FROM alpine:3.16 AS runner
+FROM alpine:3.18 AS runner
 
 RUN apk update && \
     apk add ca-certificates libc6-compat bash openssh && \
