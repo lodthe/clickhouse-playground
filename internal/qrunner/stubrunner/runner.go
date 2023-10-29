@@ -3,6 +3,7 @@ package stubrunner
 import (
 	"context"
 
+	"clickhouse-playground/internal/clientsettings"
 	"clickhouse-playground/internal/qrunner"
 
 	"github.com/pkg/errors"
@@ -52,6 +53,6 @@ func (r *Runner) Stop(_ context.Context) error {
 	return nil
 }
 
-func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
+func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string, settings clientsettings.Settings) (string, error) {
 	return r.run(ctx, runID, query, version)
 }

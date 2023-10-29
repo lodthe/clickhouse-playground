@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"clickhouse-playground/internal/clientsettings"
 	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/metrics"
 	"clickhouse-playground/internal/qrunner"
@@ -138,7 +139,7 @@ func (r *Runner) Stop(shutdownCtx context.Context) error {
 	return nil
 }
 
-func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (output string, err error) {
+func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string, settings clientsettings.Settings) (output string, err error) {
 	state := &requestState{
 		runID:   runID,
 		version: version,
