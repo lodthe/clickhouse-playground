@@ -61,7 +61,6 @@ linters:
     - typecheck
     - unused
     - bodyclose
-    - depguard
     - dogsled
     - gocognit
     - goconst

@@ -97,7 +97,7 @@ func TestBalancer_selectRunner_EqualWeights(t *testing.T) {
 	timesSelected := make(map[*Runner]uint, len(runners))
 	for i := 0; i < samples; i++ {
 		r := b.selectRunner()
-		timesSelected[r] = timesSelected[r] + 1
+		timesSelected[r]++
 	}
 
 	for _, r := range runners {
@@ -130,7 +130,7 @@ func TestBalancer_selectRunner_DifferentWeights(t *testing.T) {
 	timesSelected := make(map[*Runner]uint, len(runners))
 	for i := 0; i < samples; i++ {
 		r := b.selectRunner()
-		timesSelected[r] = timesSelected[r] + 1
+		timesSelected[r]++
 	}
 
 	for i, r := range runners {

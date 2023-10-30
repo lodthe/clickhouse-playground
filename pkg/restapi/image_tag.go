@@ -24,7 +24,7 @@ type GetImageTagsOutput struct {
 	Tags []string `json:"tags"`
 }
 
-func (h *imageTagHandler) getImageTags(w http.ResponseWriter, r *http.Request) {
+func (h *imageTagHandler) getImageTags(w http.ResponseWriter, _ *http.Request) {
 	tags := h.tagStorage.GetAll()
 
 	names := make([]string, 0, len(tags))
