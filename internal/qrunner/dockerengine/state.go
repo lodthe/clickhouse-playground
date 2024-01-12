@@ -1,11 +1,16 @@
 package dockerengine
 
+import "clickhouse-playground/internal/runsettings"
+
 // requestState holds information about a processing query execution request.
 type requestState struct {
 	runID string
 
-	version string
-	query   string
+	database string
+	version  string
+	query    string
+
+	settings runsettings.RunSettings
 
 	// <repository>:<version>
 	imageTag string

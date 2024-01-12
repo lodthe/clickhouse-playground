@@ -1,6 +1,7 @@
 package restapi
 
 import (
+	"clickhouse-playground/internal/runsettings"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -40,14 +41,38 @@ func (h *queryHandler) handle(r chi.Router) {
 }
 
 type RunQueryInput struct {
-	Query   string `json:"query"`
-	Version string `json:"version"`
+	Query    string      `json:"query"`
+	Version  string      `json:"version"`
+	Database string      `json:"data_base"`
+	Settings RunSettings `json:"settings,omitempty"`
+}
+
+type RunSettings struct {
+	ClickHouseSettings ClickHouseSettings `json:"clickhouse,omitempty"`
+}
+
+type ClickHouseSettings struct {
+	OutputFormat string `json:"output_format,omitempty"`
 }
 
 type RunQueryOutput struct {
 	QueryRunID  string `json:"query_run_id"`
 	Output      string `json:"output"`
 	TimeElapsed string `json:"time_elapsed"`
+}
+
+func convertSettings(req *RunQueryInput) runsettings.RunSettings {
+	var runSettings runsettings.RunSettings
+
+	switch req.Database {
+	default:
+		runSettings = &runsettings.ClickHouseSettings{
+			OutputFormat: req.Settings.ClickHouseSettings.OutputFormat,
+		}
+		zlog.Info().Str("Format", req.Settings.ClickHouseSettings.OutputFormat)
+	}
+
+	return runSettings
 }
 
 func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
@@ -74,10 +99,11 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	run := queryrun.New(req.Query, req.Version)
+	runSettings := convertSettings(&req)
+	run := queryrun.New(req.Query, req.Database, req.Version, runSettings)
 
 	startedAt := time.Now()
-	output, err := h.r.RunQuery(r.Context(), run.ID, req.Query, req.Version)
+	output, err := h.r.RunQuery(r.Context(), run)
 	if err != nil {
 		zlog.Error().Err(err).Interface("request", req).Msg("query run failed")
 
@@ -124,10 +150,12 @@ type GetQueryRunInput struct {
 }
 
 type GetQueryRunOutput struct {
-	QueryRunID string `json:"query_run_id"`
-	Version    string `json:"version"`
-	Input      string `json:"input"`
-	Output     string `json:"output"`
+	QueryRunID string                  `json:"query_run_id"`
+	Database   string                  `json:"database,omitempty"`
+	Version    string                  `json:"version"`
+	Settings   runsettings.RunSettings `json:"settings,omitempty"`
+	Input      string                  `json:"input"`
+	Output     string                  `json:"output"`
 }
 
 func (h *queryHandler) getQueryRun(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +179,9 @@ func (h *queryHandler) getQueryRun(w http.ResponseWriter, r *http.Request) {
 
 	writeResult(w, GetQueryRunOutput{
 		QueryRunID: run.ID,
+		Database:   run.Database,
 		Version:    run.Version,
+		Settings:   run.Settings,
 		Input:      run.Input,
 		Output:     run.Output,
 	})

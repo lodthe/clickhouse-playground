@@ -1,6 +1,7 @@
 package restapi
 
 import (
+	"clickhouse-playground/internal/queryrun"
 	"context"
 
 	"clickhouse-playground/internal/dockertag"
@@ -12,5 +13,5 @@ type TagStorage interface {
 }
 
 type QueryRunner interface {
-	RunQuery(ctx context.Context, runID string, query string, version string) (string, error)
+	RunQuery(ctx context.Context, run *queryrun.Run) (string, error)
 }

@@ -1,6 +1,7 @@
 package stubrunner
 
 import (
+	"clickhouse-playground/internal/queryrun"
 	"context"
 
 	"clickhouse-playground/internal/qrunner"
@@ -8,9 +9,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-type Run = func(ctx context.Context, runID string, query string, version string) (string, error)
+type Run = func(ctx context.Context, run *queryrun.Run) (string, error)
 
-var StubRun = func(ctx context.Context, runID string, query string, version string) (string, error) {
+var StubRun = func(ctx context.Context, run *queryrun.Run) (string, error) {
 	return "", errors.New("stub cannot run queries")
 }
 
@@ -52,6 +53,6 @@ func (r *Runner) Stop(_ context.Context) error {
 	return nil
 }
 
-func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (string, error) {
-	return r.run(ctx, runID, query, version)
+func (r *Runner) RunQuery(ctx context.Context, run *queryrun.Run) (string, error) {
+	return r.run(ctx, run)
 }

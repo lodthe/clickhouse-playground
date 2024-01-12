@@ -1,6 +1,7 @@
 package coordinator
 
 import (
+	"clickhouse-playground/internal/queryrun"
 	"context"
 	"sync"
 	"sync/atomic"
@@ -171,9 +172,9 @@ func (c *Coordinator) Stop(shutdownCtx context.Context) error {
 }
 
 // RunQuery proxies queries to one of the underlying runners.
-func (c *Coordinator) RunQuery(ctx context.Context, runID string, query string, version string) (output string, err error) {
+func (c *Coordinator) RunQuery(ctx context.Context, run *queryrun.Run) (output string, err error) {
 	processed := c.balancer.processJob(func(r *Runner) {
-		output, err = r.underlying.RunQuery(ctx, runID, query, version)
+		output, err = r.underlying.RunQuery(ctx, run)
 	})
 	if !processed {
 		return "", qrunner.ErrNoAvailableRunners
