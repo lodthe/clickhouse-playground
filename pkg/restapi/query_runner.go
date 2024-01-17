@@ -15,6 +15,10 @@ import (
 	zlog "github.com/rs/zerolog/log"
 )
 
+const (
+	ClickHouseDatabase = "clickhouse"
+)
+
 type queryHandler struct {
 	r       QueryRunner
 	runRepo queryrun.Repository
@@ -43,12 +47,12 @@ func (h *queryHandler) handle(r chi.Router) {
 type RunQueryInput struct {
 	Query    string      `json:"query"`
 	Version  string      `json:"version"`
-	Database string      `json:"data_base"`
+	Database string      `json:"database"`
 	Settings RunSettings `json:"settings,omitempty"`
 }
 
 type RunSettings struct {
-	ClickHouseSettings ClickHouseSettings `json:"clickhouse,omitempty"`
+	ClickHouseSettings *ClickHouseSettings `json:"clickhouse"`
 }
 
 type ClickHouseSettings struct {
@@ -61,18 +65,25 @@ type RunQueryOutput struct {
 	TimeElapsed string `json:"time_elapsed"`
 }
 
-func convertSettings(req *RunQueryInput) runsettings.RunSettings {
+func convertSettings(req *RunQueryInput) (runsettings.RunSettings, error) {
 	var runSettings runsettings.RunSettings
 
 	switch req.Database {
-	default:
+	// TODO: fix after move to OpenAPI
+	case ClickHouseDatabase:
+		if req.Settings.ClickHouseSettings == nil {
+			return nil, nil
+		}
+
 		runSettings = &runsettings.ClickHouseSettings{
 			OutputFormat: req.Settings.ClickHouseSettings.OutputFormat,
 		}
-		zlog.Info().Str("Format", req.Settings.ClickHouseSettings.OutputFormat)
+
+	default:
+		return nil, ErrUnknownDatabase
 	}
 
-	return runSettings
+	return runSettings, nil
 }
 
 func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +110,17 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	runSettings := convertSettings(&req)
+	// Set default database for backward compatibility
+	if req.Database == "" {
+		req.Database = ClickHouseDatabase
+	}
+
+	runSettings, err := convertSettings(&req)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	run := queryrun.New(req.Query, req.Database, req.Version, runSettings)
 
 	startedAt := time.Now()

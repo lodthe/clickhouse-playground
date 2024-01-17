@@ -9,16 +9,17 @@ type ClickHouseSettings struct {
 	OutputFormat string
 }
 
-func (s *ClickHouseSettings) Type() Type {
+func (s *ClickHouseSettings) Type() DatabaseType {
 	return TypeClickHouse
 }
 
-// GetFormatArgs gets args for custom output formatting
+// FormatArgs gets args for custom output formatting
 //
 // Returns empty args if database version doesn't support --format flag
-func (s *ClickHouseSettings) GetFormatArgs(version string, defaultOutputFormat string) []string {
+func (s *ClickHouseSettings) FormatArgs(version string, defaultOutputFormat string) []string {
 	var result []string
 
+	// Check if database version supports --format flag
 	if chsemver.IsAtLeastMajor(version, "21") {
 		outputFormat := defaultOutputFormat
 		if s.OutputFormat != "" {

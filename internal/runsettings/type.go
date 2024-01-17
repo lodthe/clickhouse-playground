@@ -1,7 +1,7 @@
 package runsettings
 
-type Type string
+type DatabaseType string
 
 const (
-	TypeClickHouse Type = "CLICKHOUSE"
+	TypeClickHouse DatabaseType = "CLICKHOUSE"
 )

@@ -14,6 +14,7 @@ import (
 	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/metrics"
 	"clickhouse-playground/internal/qrunner"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	dockercli "github.com/docker/docker/client"
@@ -392,8 +393,12 @@ func (r *Runner) execQuery(ctx context.Context, state *requestState) (stdout str
 			"--query", state.query,
 		}
 
-		settings := state.settings.(*runsettings.ClickHouseSettings)
-		formatArgs := settings.GetFormatArgs(state.version, r.cfg.DefaultOutputFormat)
+		settings, ok := state.settings.(*runsettings.ClickHouseSettings)
+		if !ok {
+			return "", "", errors.Errorf("invalid settings for type %s", state.settings.Type())
+		}
+
+		formatArgs := settings.FormatArgs(state.version, r.cfg.DefaultOutputFormat)
 		args = append(args, formatArgs...)
 	default:
 		return "", "", errors.Errorf("unknown settings type %s", state.settings.Type())
