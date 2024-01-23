@@ -1,7 +1,6 @@
 package restapi
 
 import (
-	"clickhouse-playground/internal/runsettings"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +8,7 @@ import (
 
 	"clickhouse-playground/internal/qrunner"
 	"clickhouse-playground/internal/queryrun"
+	"clickhouse-playground/internal/runsettings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
@@ -48,15 +48,15 @@ type RunQueryInput struct {
 	Query    string      `json:"query"`
 	Version  string      `json:"version"`
 	Database string      `json:"database"`
-	Settings RunSettings `json:"settings,omitempty"`
+	Settings RunSettings `json:"settings"`
 }
 
 type RunSettings struct {
-	ClickHouseSettings *ClickHouseSettings `json:"clickhouse"`
+	ClickHouseSettings *ClickHouseSettings `json:"clickhouse,omitempty"`
 }
 
 type ClickHouseSettings struct {
-	OutputFormat string `json:"output_format,omitempty"`
+	OutputFormat string `json:"output_format"`
 }
 
 type RunQueryOutput struct {
@@ -69,10 +69,9 @@ func convertSettings(req *RunQueryInput) (runsettings.RunSettings, error) {
 	var runSettings runsettings.RunSettings
 
 	switch req.Database {
-	// TODO: fix after move to OpenAPI
 	case ClickHouseDatabase:
 		if req.Settings.ClickHouseSettings == nil {
-			return nil, nil
+			return &runsettings.ClickHouseSettings{}, nil
 		}
 
 		runSettings = &runsettings.ClickHouseSettings{

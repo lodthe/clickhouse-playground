@@ -1,13 +1,13 @@
 package coordinator
 
 import (
-	"clickhouse-playground/internal/queryrun"
 	"context"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"clickhouse-playground/internal/qrunner"
+	"clickhouse-playground/internal/queryrun"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"

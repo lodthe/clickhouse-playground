@@ -6,24 +6,24 @@ import (
 
 // ClickHouseSettings contains settings for clickhouse client
 type ClickHouseSettings struct {
-	OutputFormat string
+	OutputFormat string `dynamodbav:"OutputFormat"`
 }
 
-func (s *ClickHouseSettings) Type() DatabaseType {
+func (cs *ClickHouseSettings) Type() DatabaseType {
 	return TypeClickHouse
 }
 
 // FormatArgs gets args for custom output formatting
 //
 // Returns empty args if database version doesn't support --format flag
-func (s *ClickHouseSettings) FormatArgs(version string, defaultOutputFormat string) []string {
+func (cs *ClickHouseSettings) FormatArgs(version string, defaultOutputFormat string) []string {
 	var result []string
 
 	// Check if database version supports --format flag
 	if chsemver.IsAtLeastMajor(version, "21") {
 		outputFormat := defaultOutputFormat
-		if s.OutputFormat != "" {
-			outputFormat = s.OutputFormat
+		if cs.OutputFormat != "" {
+			outputFormat = cs.OutputFormat
 		}
 
 		result = append(result,

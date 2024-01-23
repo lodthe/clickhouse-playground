@@ -1,9 +1,9 @@
 package qrunner
 
 import (
-	"clickhouse-playground/internal/queryrun"
-
 	"context"
+
+	"clickhouse-playground/internal/queryrun"
 )
 
 type Runner interface {

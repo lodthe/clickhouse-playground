@@ -1,10 +1,10 @@
 package stubrunner
 
 import (
-	"clickhouse-playground/internal/queryrun"
 	"context"
 
 	"clickhouse-playground/internal/qrunner"
+	"clickhouse-playground/internal/queryrun"
 
 	"github.com/pkg/errors"
 )

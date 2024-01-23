@@ -2,8 +2,6 @@ package dockerengine
 
 import (
 	"bytes"
-	"clickhouse-playground/internal/queryrun"
-	"clickhouse-playground/internal/runsettings"
 	"context"
 	"fmt"
 	"io"
@@ -14,6 +12,8 @@ import (
 	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/metrics"
 	"clickhouse-playground/internal/qrunner"
+	"clickhouse-playground/internal/queryrun"
+	"clickhouse-playground/internal/runsettings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"

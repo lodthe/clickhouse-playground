@@ -1,10 +1,10 @@
 package restapi
 
 import (
-	"clickhouse-playground/internal/queryrun"
 	"context"
 
 	"clickhouse-playground/internal/dockertag"
+	"clickhouse-playground/internal/queryrun"
 )
 
 type TagStorage interface {

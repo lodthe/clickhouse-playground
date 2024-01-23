@@ -1,8 +1,9 @@
 package queryrun
 
 import (
-	"clickhouse-playground/internal/runsettings"
 	"time"
+
+	"clickhouse-playground/internal/runsettings"
 
 	"github.com/google/uuid"
 )
