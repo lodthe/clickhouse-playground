@@ -67,8 +67,8 @@ func (r *Repo) Get(id string) (*Run, error) {
 	// Done because UnmarshalMap can't unmarshal in interface{}
 	var database string
 	attributevalue.Unmarshal(out.Item["Database"], &database)
-	switch database {
-	case "clickhouse":
+	// TODO: add switch-case in the future
+	if database == "clickhouse" {
 		run.Settings = &runsettings.ClickHouseSettings{}
 	}
 
