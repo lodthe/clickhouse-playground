@@ -1,6 +1,7 @@
 package runsettings
 
 import (
+	"clickhouse-playground/internal/database"
 	"clickhouse-playground/pkg/chsemver"
 )
 
@@ -9,8 +10,8 @@ type ClickHouseSettings struct {
 	OutputFormat string `dynamodbav:"OutputFormat"`
 }
 
-func (cs *ClickHouseSettings) Type() DatabaseType {
-	return TypeClickHouse
+func (cs *ClickHouseSettings) Type() database.Type {
+	return database.TypeClickHouse
 }
 
 // FormatArgs gets args for custom output formatting

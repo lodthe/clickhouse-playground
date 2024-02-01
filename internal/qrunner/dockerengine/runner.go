@@ -9,11 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"clickhouse-playground/internal/database"
+	"clickhouse-playground/internal/database/runsettings"
 	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/metrics"
 	"clickhouse-playground/internal/qrunner"
 	"clickhouse-playground/internal/queryrun"
-	"clickhouse-playground/internal/runsettings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -314,7 +315,7 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 
 	contConfig := &container.Config{
 		Image:  state.imageFQN,
-		Labels: qrunner.CreateContainerLabels(state.runID, state.version),
+		Labels: qrunner.CreateContainerLabels(r.name, state.runID, state.version),
 	}
 
 	var networkMode string
@@ -385,7 +386,7 @@ func (r *Runner) execQuery(ctx context.Context, state *requestState) (stdout str
 	var args []string
 
 	switch state.settings.Type() {
-	case runsettings.TypeClickHouse:
+	case database.TypeClickHouse:
 		args = []string{
 			"clickhouse", "client",
 			"-n",

@@ -2,13 +2,16 @@ package dockerengine
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
+	"clickhouse-playground/internal/database/runsettings"
 	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/queryrun"
-	"clickhouse-playground/internal/runsettings"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -91,4 +94,25 @@ func TestCustomSettings(t *testing.T) {
 		}
 		assert.Equal(t, tc.expectedOutput, output)
 	}
+
+	t.Cleanup(func() {
+		//Fetch all remaining test containers
+		containers, err := runner.engine.cli.ContainerList(ctx, types.ContainerListOptions{
+			Filters: filters.NewArgs(filters.Arg("label", "clickhouse.playground.runner=Test")),
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		//Remove all remaining test containers
+		for _, container := range containers {
+			err = runner.engine.cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
+				RemoveVolumes: true,
+				Force:         true,
+			})
+			if err != nil && !strings.Contains(err.Error(), "is already in progress") {
+				panic(err)
+			}
+		}
+	})
 }

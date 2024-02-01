@@ -1,6 +1,8 @@
 package dockerengine
 
-import "clickhouse-playground/internal/runsettings"
+import (
+	"clickhouse-playground/internal/database/runsettings"
+)
 
 // requestState holds information about a processing query execution request.
 type requestState struct {
