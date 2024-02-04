@@ -100,9 +100,7 @@ func TestCustomSettings(t *testing.T) {
 		containers, err := runner.engine.cli.ContainerList(ctx, types.ContainerListOptions{
 			Filters: filters.NewArgs(filters.Arg("label", "clickhouse.playground.runner=Test")),
 		})
-		if err != nil {
-			panic(err)
-		}
+		assert.NoError(t, err)
 
 		//Remove all remaining test containers
 		for _, container := range containers {
@@ -110,9 +108,10 @@ func TestCustomSettings(t *testing.T) {
 				RemoveVolumes: true,
 				Force:         true,
 			})
-			if err != nil && !strings.Contains(err.Error(), "is already in progress") {
-				panic(err)
+			if err != nil && strings.Contains(err.Error(), "is already in progress") {
+				continue
 			}
+			assert.NoError(t, err)
 		}
 	})
 }
