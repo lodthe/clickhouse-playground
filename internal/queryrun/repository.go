@@ -3,6 +3,9 @@ package queryrun
 import (
 	"context"
 
+	"clickhouse-playground/internal/database"
+	"clickhouse-playground/internal/database/runsettings"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -61,6 +64,15 @@ func (r *Repo) Get(id string) (*Run, error) {
 	}
 
 	run := new(Run)
+
+	// Done because UnmarshalMap can't unmarshal in interface{}
+	var databaseType database.Type
+	attributevalue.Unmarshal(out.Item["Database"], &databaseType)
+	// TODO: add switch-case in the future
+	if databaseType == database.TypeClickHouse {
+		run.Settings = &runsettings.ClickHouseSettings{}
+	}
+
 	err = attributevalue.UnmarshalMap(out.Item, run)
 	if err != nil {
 		return nil, errors.Wrap(err, "unmarshal failed")

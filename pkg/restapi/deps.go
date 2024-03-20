@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"clickhouse-playground/internal/dockertag"
+	"clickhouse-playground/internal/queryrun"
 )
 
 type TagStorage interface {
@@ -12,5 +13,5 @@ type TagStorage interface {
 }
 
 type QueryRunner interface {
-	RunQuery(ctx context.Context, runID string, query string, version string) (string, error)
+	RunQuery(ctx context.Context, run *queryrun.Run) (string, error)
 }

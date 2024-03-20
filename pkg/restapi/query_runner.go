@@ -6,12 +6,17 @@ import (
 	"net/http"
 	"time"
 
+	"clickhouse-playground/internal/database/runsettings"
 	"clickhouse-playground/internal/qrunner"
 	"clickhouse-playground/internal/queryrun"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
 	zlog "github.com/rs/zerolog/log"
+)
+
+const (
+	ClickHouseDatabase = "clickhouse"
 )
 
 type queryHandler struct {
@@ -40,14 +45,44 @@ func (h *queryHandler) handle(r chi.Router) {
 }
 
 type RunQueryInput struct {
-	Query   string `json:"query"`
-	Version string `json:"version"`
+	Query    string      `json:"query"`
+	Version  string      `json:"version"`
+	Database string      `json:"database"`
+	Settings RunSettings `json:"settings"`
+}
+
+type RunSettings struct {
+	ClickHouseSettings *ClickHouseSettings `json:"clickhouse,omitempty"`
+}
+
+type ClickHouseSettings struct {
+	OutputFormat string `json:"output_format"`
 }
 
 type RunQueryOutput struct {
 	QueryRunID  string `json:"query_run_id"`
 	Output      string `json:"output"`
 	TimeElapsed string `json:"time_elapsed"`
+}
+
+func convertSettings(req *RunQueryInput) (runsettings.RunSettings, error) {
+	var runSettings runsettings.RunSettings
+
+	switch req.Database {
+	case ClickHouseDatabase:
+		if req.Settings.ClickHouseSettings == nil {
+			return &runsettings.ClickHouseSettings{}, nil
+		}
+
+		runSettings = &runsettings.ClickHouseSettings{
+			OutputFormat: req.Settings.ClickHouseSettings.OutputFormat,
+		}
+
+	default:
+		return nil, ErrUnknownDatabase
+	}
+
+	return runSettings, nil
 }
 
 func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
@@ -74,10 +109,21 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	run := queryrun.New(req.Query, req.Version)
+	// Set default database for backward compatibility
+	if req.Database == "" {
+		req.Database = ClickHouseDatabase
+	}
+
+	runSettings, err := convertSettings(&req)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	run := queryrun.New(req.Query, req.Database, req.Version, runSettings)
 
 	startedAt := time.Now()
-	output, err := h.r.RunQuery(r.Context(), run.ID, req.Query, req.Version)
+	output, err := h.r.RunQuery(r.Context(), run)
 	if err != nil {
 		zlog.Error().Err(err).Interface("request", req).Msg("query run failed")
 
@@ -124,10 +170,12 @@ type GetQueryRunInput struct {
 }
 
 type GetQueryRunOutput struct {
-	QueryRunID string `json:"query_run_id"`
-	Version    string `json:"version"`
-	Input      string `json:"input"`
-	Output     string `json:"output"`
+	QueryRunID string                  `json:"query_run_id"`
+	Database   string                  `json:"database,omitempty"`
+	Version    string                  `json:"version"`
+	Settings   runsettings.RunSettings `json:"settings,omitempty"`
+	Input      string                  `json:"input"`
+	Output     string                  `json:"output"`
 }
 
 func (h *queryHandler) getQueryRun(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +199,9 @@ func (h *queryHandler) getQueryRun(w http.ResponseWriter, r *http.Request) {
 
 	writeResult(w, GetQueryRunOutput{
 		QueryRunID: run.ID,
+		Database:   run.Database,
 		Version:    run.Version,
+		Settings:   run.Settings,
 		Input:      run.Input,
 		Output:     run.Output,
 	})

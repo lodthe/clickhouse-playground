@@ -9,10 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"clickhouse-playground/internal/database"
+	"clickhouse-playground/internal/database/runsettings"
 	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/metrics"
 	"clickhouse-playground/internal/qrunner"
-	"clickhouse-playground/pkg/chsemver"
+	"clickhouse-playground/internal/queryrun"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -138,11 +140,13 @@ func (r *Runner) Stop(shutdownCtx context.Context) error {
 	return nil
 }
 
-func (r *Runner) RunQuery(ctx context.Context, runID string, query string, version string) (output string, err error) {
+func (r *Runner) RunQuery(ctx context.Context, run *queryrun.Run) (output string, err error) {
 	state := &requestState{
-		runID:   runID,
-		version: version,
-		query:   query,
+		runID:    run.ID,
+		database: run.Database,
+		version:  run.Version,
+		query:    run.Input,
+		settings: run.Settings,
 	}
 
 	state.imageTag, state.imageFQN, err = r.constructImageFQN(state.version)
@@ -152,7 +156,7 @@ func (r *Runner) RunQuery(ctx context.Context, runID string, query string, versi
 
 	containerID, found, err := r.prewarmer.Fetch(state.imageFQN)
 	if err != nil {
-		r.logger.Err(err).Str("run_id", runID).Msg("failed to fetch a prewarmed container")
+		r.logger.Err(err).Str("run_id", state.runID).Msg("failed to fetch a prewarmed container")
 	}
 	if found {
 		state.containerID = containerID
@@ -311,7 +315,7 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 
 	contConfig := &container.Config{
 		Image:  state.imageFQN,
-		Labels: qrunner.CreateContainerLabels(state.runID, state.version),
+		Labels: qrunner.CreateContainerLabels(r.name, state.runID, state.version),
 	}
 
 	var networkMode string
@@ -379,19 +383,26 @@ func (r *Runner) execQuery(ctx context.Context, state *requestState) (stdout str
 		r.pipelineMetr.ExecCommand(err == nil, state.version, invokedAt)
 	}()
 
-	args := []string{
-		"clickhouse", "client",
-		"-n",
-		"-m",
-		"--query", state.query,
-	}
+	var args []string
 
-	// Inject some format options to make output prettier.
-	if chsemver.IsAtLeastMajor(state.version, "21") {
-		args = append(args,
-			"--output_format_pretty_color", "0",
-			"--output_format_pretty_grid_charset", "ASCII",
-			"--format", r.cfg.DefaultOutputFormat)
+	switch state.settings.Type() {
+	case database.TypeClickHouse:
+		args = []string{
+			"clickhouse", "client",
+			"-n",
+			"-m",
+			"--query", state.query,
+		}
+
+		settings, ok := state.settings.(*runsettings.ClickHouseSettings)
+		if !ok {
+			return "", "", errors.Errorf("invalid settings for type %s", state.settings.Type())
+		}
+
+		formatArgs := settings.FormatArgs(state.version, r.cfg.DefaultOutputFormat)
+		args = append(args, formatArgs...)
+	default:
+		return "", "", errors.Errorf("unknown settings type %s", state.settings.Type())
 	}
 
 	resp, err := r.engine.exec(ctx, state.containerID, args)

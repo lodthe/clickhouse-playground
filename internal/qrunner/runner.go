@@ -2,6 +2,8 @@ package qrunner
 
 import (
 	"context"
+
+	"clickhouse-playground/internal/queryrun"
 )
 
 type Runner interface {
@@ -10,7 +12,7 @@ type Runner interface {
 
 	Status(ctx context.Context) RunnerStatus
 
-	RunQuery(ctx context.Context, runID string, query string, version string) (string, error)
+	RunQuery(ctx context.Context, run *queryrun.Run) (string, error)
 
 	// Start initializes background processes (like garbage collection and status exporter).
 	// This function is non-blocking.
