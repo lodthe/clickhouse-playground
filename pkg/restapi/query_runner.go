@@ -45,10 +45,11 @@ func (h *queryHandler) handle(r chi.Router) {
 }
 
 type RunQueryInput struct {
-	Query    string      `json:"query"`
-	Version  string      `json:"version"`
-	Database string      `json:"database"`
-	Settings RunSettings `json:"settings"`
+	Query       string      `json:"query"`
+	Version     string      `json:"version"`
+	Database    string      `json:"database"`
+	Settings    RunSettings `json:"settings"`
+	SaveRunInfo bool        `json:"save_run_info"`
 }
 
 type RunSettings struct {
@@ -86,7 +87,12 @@ func convertSettings(req *RunQueryInput) (runsettings.RunSettings, error) {
 }
 
 func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
-	var req RunQueryInput
+	// init request with default values
+	req := RunQueryInput{
+		Database:    ClickHouseDatabase,
+		SaveRunInfo: true,
+	}
+
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
@@ -107,11 +113,6 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 	if !h.tagStorage.Exists(req.Version) {
 		writeError(w, "unknown version", http.StatusBadRequest)
 		return
-	}
-
-	// Set default database for backward compatibility
-	if req.Database == "" {
-		req.Database = ClickHouseDatabase
 	}
 
 	runSettings, err := convertSettings(&req)
@@ -148,21 +149,27 @@ func (h *queryHandler) runQuery(w http.ResponseWriter, r *http.Request) {
 	run.Output = output
 	run.ExecutionTime = timeElapsed
 
-	err = h.runRepo.Create(run)
-	if err != nil {
-		zlog.Error().Err(err).Interface("model", run).Msg("a run cannot be saved")
-		writeError(w, "internal error", http.StatusInternalServerError)
+	zlog.Info().Str("id", run.ID).Dur("elapsed", timeElapsed).Msg("processed a new run")
 
-		return
-	}
-
-	zlog.Info().Str("id", run.ID).Dur("elapsed", timeElapsed).Msg("saved a new run")
-
-	writeResult(w, RunQueryOutput{
-		QueryRunID:  run.ID,
+	requestResult := RunQueryOutput{
 		Output:      run.Output,
 		TimeElapsed: timeElapsed.Round(time.Millisecond).String(),
-	})
+	}
+
+	if req.SaveRunInfo {
+		requestResult.QueryRunID = run.ID
+		err = h.runRepo.Create(run)
+		if err != nil {
+			zlog.Error().Err(err).Interface("model", run).Msg("a run cannot be saved")
+			writeError(w, "internal error", http.StatusInternalServerError)
+
+			return
+		}
+
+		zlog.Info().Msg("run saved successfully")
+	}
+
+	writeResult(w, requestResult)
 }
 
 type GetQueryRunInput struct {
