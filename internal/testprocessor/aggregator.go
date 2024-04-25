@@ -30,7 +30,6 @@ func (a *Aggregator) Percentile(percentile int) (string, error) {
 
 func (a *Aggregator) PrintPercentiles(percentilesToCalculate []int) {
 	for _, perc := range percentilesToCalculate {
-
 		percValue, err := a.Percentile(perc)
 		if err != nil {
 			zlog.Error().Err(err).Msg("failed to calculate percentile")

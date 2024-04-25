@@ -14,7 +14,7 @@ type Action string
 
 const (
 	RunTest    Action = "run-test"
-	ImportRuns        = "import-runs"
+	ImportRuns Action = "import-runs"
 )
 
 func main() {

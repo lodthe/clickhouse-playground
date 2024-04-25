@@ -104,12 +104,12 @@ func (p *Processor) processParallelMode() {
 
 func (p *Processor) exportTestResult(runs []*Run) {
 	file, err := os.Create(p.Config.OutputPath)
-	defer file.Close()
-
 	if err != nil {
 		zlog.Error().Err(err).Msg("unable to create output file")
 		return
 	}
+
+	defer file.Close()
 
 	w := csv.NewWriter(file)
 	defer w.Flush()
