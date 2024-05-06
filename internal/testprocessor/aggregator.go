@@ -8,24 +8,24 @@ import (
 )
 
 type Aggregator struct {
-	runs []*runs.Run
+	runsData []*runs.Run
 }
 
-func NewAggregator(runs []*runs.Run) *Aggregator {
-	sort.Slice(runs, func(i, j int) bool {
-		return *runs[i].TimeElapsed < *runs[j].TimeElapsed
+func NewAggregator(runsData []*runs.Run) *Aggregator {
+	sort.Slice(runsData, func(i, j int) bool {
+		return *runsData[i].TimeElapsed < *runsData[j].TimeElapsed
 	})
-	return &Aggregator{runs: runs}
+	return &Aggregator{runsData: runsData}
 }
 
 func (a *Aggregator) Percentile(percentile int) (string, error) {
-	index := len(a.runs)*percentile/100 - 1
+	index := len(a.runsData)*percentile/100 - 1
 
 	if index < 0 {
 		return "", fmt.Errorf("invalid index %d for percentile %d", index, percentile)
 	}
 
-	return a.runs[index].TimeElapsed.String(), nil
+	return a.runsData[index].TimeElapsed.String(), nil
 }
 
 func (a *Aggregator) PrintPercentiles(percentilesToCalculate []int) {

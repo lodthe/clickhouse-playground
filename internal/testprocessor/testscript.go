@@ -32,7 +32,7 @@ type PlaygroundClient interface {
 }
 
 type RunsProcessor interface {
-	Process(runs *runs.Data)
+	Process(runsData *runs.Data)
 }
 
 func New(config *Config) *Processor {
@@ -79,7 +79,7 @@ func (p *Processor) Process(playgroundClient PlaygroundClient) error {
 	return nil
 }
 
-func (p *Processor) exportTestResult(runs *runs.Data) error {
+func (p *Processor) exportTestResult(runsData *runs.Data) error {
 	outputFile, err := os.Create(p.Config.OutputPath)
 	if err != nil {
 		return fmt.Errorf("unable to create output file: %w", err)
@@ -87,7 +87,7 @@ func (p *Processor) exportTestResult(runs *runs.Data) error {
 
 	defer outputFile.Close()
 
-	yamlFile, err := yaml.Marshal(runs)
+	yamlFile, err := yaml.Marshal(runsData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal runs to yaml: %w", err)
 	}

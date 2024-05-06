@@ -16,6 +16,6 @@ func (p *ParallelRunsProcessor) Mode() Mode {
 	return ParallelMode
 }
 
-func (p *ParallelRunsProcessor) Process(runsData *runs.Data) {
+func (p *ParallelRunsProcessor) Process(_ *runs.Data) {
 	// TODO: implement parallel mode
 }
