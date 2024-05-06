@@ -1,4 +1,4 @@
-package testprocessor
+package runs
 
 import (
 	"context"
@@ -14,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gconfig "github.com/gookit/config/v2"
 	"github.com/pkg/errors"
-	zlog "github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 )
 
@@ -40,29 +39,25 @@ func (p *ImportRunsParams) Retrieve(_ context.Context) (aws.Credentials, error) 
 	}, nil
 }
 
-type RunsInput struct {
+type Data struct {
 	Runs []*Run `mapstructure:"runs" yaml:"runs"`
 }
 
 type Run struct {
-	Database    string        `mapstructure:"database" yaml:"database" dynamodbav:"Database"`
-	Version     string        `mapstructure:"version" yaml:"version" dynamodbav:"Version"`
-	Query       string        `mapstructure:"query" yaml:"query" dynamodbav:"Input"`
-	Timestamp   time.Time     `mapstructure:"timestamp" yaml:"timestamp" dynamodbav:"CreatedAt"`
-	TimeElapsed time.Duration `mapstructure:"-" yaml:"-" dynamodbav:"-"`
+	Database    string         `mapstructure:"database" yaml:"database" dynamodbav:"Database"`
+	Version     string         `mapstructure:"version" yaml:"version" dynamodbav:"Version"`
+	Query       string         `mapstructure:"query" yaml:"query" dynamodbav:"Data"`
+	Timestamp   time.Time      `mapstructure:"timestamp" yaml:"timestamp" dynamodbav:"CreatedAt"`
+	TimeElapsed *time.Duration `mapstructure:"-" yaml:"time_elapsed,omitempty" dynamodbav:"-"`
 }
 
-func (r *Run) CsvRow() []string {
-	return []string{r.Database, r.Version, r.Query, r.TimeElapsed.String()}
-}
-
-func loadRuns(runsFilePath string) (*RunsInput, error) {
+func LoadRuns(runsFilePath string) (*Data, error) {
 	err := gconfig.LoadFiles(runsFilePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load runs")
 	}
 
-	runs := new(RunsInput)
+	runs := new(Data)
 	err = gconfig.BindStruct("", runs)
 	if err != nil {
 		return nil, errors.Wrap(err, "runs data binding failed")
@@ -74,7 +69,7 @@ func loadRuns(runsFilePath string) (*RunsInput, error) {
 }
 
 // validate verifies the loaded runs and sets default values for missed fields.
-func (runs *RunsInput) validate() {
+func (runs *Data) validate() {
 	for _, run := range runs.Runs {
 		if run.Database == "" {
 			run.Database = clickhouseDatabase
@@ -82,7 +77,7 @@ func (runs *RunsInput) validate() {
 	}
 }
 
-func ImportRunsFromAWS(params *ImportRunsParams) {
+func ImportRunsFromAWS(params *ImportRunsParams) error {
 	ctx := context.Background()
 
 	var awsOpts []func(*awsconf.LoadOptions) error
@@ -94,18 +89,18 @@ func ImportRunsFromAWS(params *ImportRunsParams) {
 
 	awsConfig, err := awsconf.LoadDefaultConfig(ctx, awsOpts...)
 	if err != nil {
-		zlog.Fatal().Err(err).Msg("failed to load AWS config")
+		return fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	outputFile, err := os.Create(params.OutputPath)
 	if err != nil {
-		zlog.Fatal().Err(err).Msg("failed create output file")
+		return fmt.Errorf("failed to create output file: %w", err)
 	}
 	defer outputFile.Close()
 
 	dynamodbClient := dynamodb.NewFromConfig(awsConfig)
 
-	var importedRuns RunsInput
+	var importedRuns Data
 	var lastEvaluatedKey map[string]types.AttributeValue
 
 	for {
@@ -125,7 +120,7 @@ func ImportRunsFromAWS(params *ImportRunsParams) {
 		})
 
 		if scanErr != nil {
-			zlog.Fatal().Err(scanErr).Msg("error while scan")
+			return fmt.Errorf("failed to scan: %w", err)
 		}
 
 		lastEvaluatedKey = out.LastEvaluatedKey
@@ -135,13 +130,15 @@ func ImportRunsFromAWS(params *ImportRunsParams) {
 
 			err = attributevalue.UnmarshalMap(item, run)
 			if err != nil {
-				zlog.Error().Err(err).Msg("failed to unmarshal db run")
+				fmt.Println("failed to unmarshal db run: %w", err)
 				continue
 			}
 
 			if run.Database == "" {
 				run.Database = clickhouseDatabase
 			}
+
+			run.TimeElapsed = nil
 
 			importedRuns.Runs = append(importedRuns.Runs, run)
 		}
@@ -157,13 +154,14 @@ func ImportRunsFromAWS(params *ImportRunsParams) {
 
 	yamlFile, err := yaml.Marshal(&importedRuns)
 	if err != nil {
-		zlog.Error().Err(err).Msg("failed to marshal runs to yaml")
+		return fmt.Errorf("failed to marshal runs to yaml: %w", err)
 	}
 
 	_, err = outputFile.WriteString(string(yamlFile))
 	if err != nil {
-		zlog.Error().Err(err).Msg("failed to write data to output file")
+		return fmt.Errorf("failed to write data to output file: %w", err)
 	}
 
-	fmt.Printf("Successfyly imported %d runs\n", len(importedRuns.Runs))
+	fmt.Printf("Successfully imported %d runs\n", len(importedRuns.Runs))
+	return nil
 }

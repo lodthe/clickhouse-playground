@@ -2,12 +2,11 @@ package main
 
 import (
 	"clickhouse-playground/internal/testprocessor"
+	"clickhouse-playground/internal/testprocessor/runs"
 	"clickhouse-playground/pkg/playgroundclient"
 	"flag"
 	"fmt"
 	"time"
-
-	zlog "github.com/rs/zerolog/log"
 )
 
 type Action string
@@ -43,7 +42,8 @@ func main() {
 
 	config, err := LoadConfig()
 	if err != nil {
-		zlog.Fatal().Err(err).Msg("config cannot be loaded")
+		fmt.Printf("config cannot be loaded: %s\n", err)
+		return
 	}
 
 	switch Action(action) {
@@ -57,7 +57,10 @@ func main() {
 				"You can specify output csv file path by setting \"output_path\" argument in config")
 			return
 		}
-		runTest(config)
+		err = runTest(config)
+		if err != nil {
+			fmt.Println("Error while running test script: %w", err)
+		}
 	case ImportRuns:
 		if needHelp {
 			fmt.Println("Imports runs data from DynamoDB with given time borders.\n\n" +
@@ -77,22 +80,25 @@ func main() {
 
 		runsAfter, err = time.Parse(time.DateTime, importRunsAfter)
 		if err != nil {
-			zlog.Fatal().Err(err).Msg("invalid time format for \"after\" argument")
+			fmt.Printf("invalid time format for \"after\" argument: %s\n", err)
+			return
 		}
 
 		runsBefore = time.Now()
 		if importRunsBefore != "" {
 			runsBefore, err = time.Parse(time.DateTime, importRunsBefore)
 			if err != nil {
-				zlog.Fatal().Err(err).Msg("invalid time format for \"before\" argument")
+				fmt.Printf("invalid time format for \"before\" argument: %s\n", err)
+				return
 			}
 		}
 
 		if runsBefore.Before(runsAfter) {
-			zlog.Fatal().Err(err).Msg("right time border cannot be before left time border")
+			fmt.Println("Right time border cannot be before left time border")
+			return
 		}
 
-		testprocessor.ImportRunsFromAWS(&testprocessor.ImportRunsParams{
+		err = runs.ImportRunsFromAWS(&runs.ImportRunsParams{
 			AwsAccessKeyID:        config.AWS.AccessKeyID,
 			AwsSecretAccessKey:    config.AWS.SecretAccessKey,
 			AwsRegion:             config.AWS.Region,
@@ -101,19 +107,21 @@ func main() {
 			RunsAfter:             runsAfter,
 			OutputPath:            outputFile,
 		})
+		if err != nil {
+			fmt.Printf("Faiiled to import runs: %s\n", err)
+		}
 
 	default:
 		fmt.Println("Unknown action type. Supported: run-test, import-runs. Use --help for more information.")
-		return
 	}
 }
 
-func runTest(config *Config) {
+func runTest(config *Config) error {
 	playgroundClient := playgroundclient.New(&playgroundclient.Config{
 		BaseURL: config.Playground.BaseURL,
 	})
 
-	testProcessor := testprocessor.New(playgroundClient, &testprocessor.Config{
+	testProcessor := testprocessor.New(&testprocessor.Config{
 		Mode:         config.TestScript.Mode,
 		RunsDataPath: config.TestScript.RunsDataPath,
 		OutputPath:   *config.TestScript.OutputPath,
@@ -121,5 +129,10 @@ func runTest(config *Config) {
 		Percentiles:  config.TestScript.Percentiles,
 	})
 
-	testProcessor.Process()
+	err := testProcessor.Process(playgroundClient)
+	if err != nil {
+		fmt.Printf("Failed to process test script: %s\n", err)
+	}
+
+	return nil
 }

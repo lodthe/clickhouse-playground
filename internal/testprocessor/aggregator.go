@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"sort"
 
-	zlog "github.com/rs/zerolog/log"
+	"clickhouse-playground/internal/testprocessor/runs"
 )
 
 type Aggregator struct {
-	runs []*Run
+	runs []*runs.Run
 }
 
-func NewAggregator(runs []*Run) *Aggregator {
+func NewAggregator(runs []*runs.Run) *Aggregator {
 	sort.Slice(runs, func(i, j int) bool {
-		return runs[i].TimeElapsed < runs[j].TimeElapsed
+		return *runs[i].TimeElapsed < *runs[j].TimeElapsed
 	})
 	return &Aggregator{runs: runs}
 }
@@ -32,7 +32,7 @@ func (a *Aggregator) PrintPercentiles(percentilesToCalculate []int) {
 	for _, perc := range percentilesToCalculate {
 		percValue, err := a.Percentile(perc)
 		if err != nil {
-			zlog.Error().Err(err).Msg("failed to calculate percentile")
+			fmt.Printf("Failed to calculate percentile %d: %s\n", perc, err)
 		}
 
 		fmt.Printf("Percentile %d: %s\n", perc, percValue)

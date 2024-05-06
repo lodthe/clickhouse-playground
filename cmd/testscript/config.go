@@ -1,7 +1,7 @@
 package main
 
 import (
-	"clickhouse-playground/internal/testprocessor"
+	"clickhouse-playground/internal/testprocessor/runsprocessors"
 
 	gconfig "github.com/gookit/config/v2"
 	gyaml "github.com/gookit/config/v2/yaml"
@@ -27,11 +27,11 @@ type PlaygroundSettings struct {
 }
 
 type TestScript struct {
-	Mode         testprocessor.Mode `mapstructure:"mode"`
-	RunsDataPath string             `mapstructure:"runs_data_path"`
-	OutputPath   *string            `mapstructure:"output_path"`
-	DefaultQuery *string            `mapstructure:"default_query"`
-	Percentiles  []int              `mapstructure:"percentiles_to_calculate"`
+	Mode         runsprocessors.Mode `mapstructure:"mode"`
+	RunsDataPath string              `mapstructure:"runs_data_path"`
+	OutputPath   *string             `mapstructure:"output_path"`
+	DefaultQuery *string             `mapstructure:"default_query"`
+	Percentiles  []int               `mapstructure:"percentiles_to_calculate"`
 }
 
 type AWS struct {

@@ -1,128 +1,101 @@
 package testprocessor
 
 import (
-	"encoding/csv"
 	"fmt"
 	"os"
 	"time"
 
-	zlog "github.com/rs/zerolog/log"
+	"clickhouse-playground/internal/testprocessor/runs"
+	"clickhouse-playground/internal/testprocessor/runsprocessors"
+
+	"gopkg.in/yaml.v3"
+
+	"github.com/pkg/errors"
 )
 
-type Mode string
-
-const (
-	SerialMode              Mode = "serial"
-	SerialWithoutDelaysMode Mode = "serial-without-delays"
-	ParallelMode            Mode = "parallel"
-)
+var UnknownModeError = errors.New("unknown mode")
 
 type Config struct {
-	Mode         Mode
+	Mode         runsprocessors.Mode
 	RunsDataPath string
 	OutputPath   string
 	DefaultQuery *string
 	Percentiles  []int
 }
 
+type Processor struct {
+	Config *Config
+}
+
 type PlaygroundClient interface {
 	PostRuns(database string, version string, query string) (time.Duration, error)
 }
 
-type Processor struct {
-	PlaygroundClient PlaygroundClient
-	Config           *Config
+type RunsProcessor interface {
+	Process(runs *runs.Data)
 }
 
-func New(playgroundClient PlaygroundClient, config *Config) *Processor {
+func New(config *Config) *Processor {
 	return &Processor{
-		PlaygroundClient: playgroundClient,
-		Config:           config,
+		Config: config,
 	}
 }
 
-func (p *Processor) Process() {
-	runs, err := loadRuns(p.Config.RunsDataPath)
+func (p *Processor) Process(playgroundClient PlaygroundClient) error {
+	inputRuns, err := runs.LoadRuns(p.Config.RunsDataPath)
 	if err != nil {
-		zlog.Fatal().Err(err).Msg("runs data cannot be loaded")
+		return fmt.Errorf("runs data cannot be loaded: %w", err)
 	}
 
 	if p.Config.DefaultQuery != nil {
-		for _, run := range runs.Runs {
+		for _, run := range inputRuns.Runs {
 			run.Query = *p.Config.DefaultQuery
 		}
 	}
 
+	var runsProcessor RunsProcessor
+
 	switch p.Config.Mode {
-	case SerialMode:
-		p.processSerialMode(runs)
-	case SerialWithoutDelaysMode:
-		p.processSerialWithoutDelaysMode(runs)
-	case ParallelMode:
-		p.processParallelMode()
+	case runsprocessors.SerialMode:
+		runsProcessor = runsprocessors.NewSerialModeProcessor(playgroundClient)
+	case runsprocessors.SerialWithoutDelaysMode:
+		runsProcessor = runsprocessors.NewSerialWithoutDelaysModeProcessor(playgroundClient)
+	case runsprocessors.ParallelMode:
+		runsProcessor = runsprocessors.NewParallelModeProcessor(playgroundClient)
 	default:
-		zlog.Fatal().Msg("unknown mode")
+		return UnknownModeError
 	}
 
-	p.exportTestResult(runs.Runs)
+	runsProcessor.Process(inputRuns)
 
-	aggregator := NewAggregator(runs.Runs)
-	aggregator.PrintPercentiles(p.Config.Percentiles)
-}
-
-func (p *Processor) processSerialMode(runs *RunsInput) {
-	for i, run := range runs.Runs {
-		runResult, err := p.PlaygroundClient.PostRuns(run.Database, run.Version, run.Query)
-		if err != nil {
-			zlog.Error().Err(err).Msg("received error from playground client")
-		}
-		run.TimeElapsed = runResult
-		zlog.Info().Msg(fmt.Sprintf("processed request: %s", runResult.String()))
-
-		if i != len(runs.Runs)-1 {
-			nextRequestTime := runs.Runs[i+1].Timestamp
-			sleepDelta := nextRequestTime.Sub(run.Timestamp)
-			time.Sleep(sleepDelta)
-		}
-	}
-}
-
-func (p *Processor) processSerialWithoutDelaysMode(runs *RunsInput) {
-	for _, run := range runs.Runs {
-		runResult, err := p.PlaygroundClient.PostRuns(run.Database, run.Version, run.Query)
-		if err != nil {
-			zlog.Error().Err(err).Msg("received error from playground client")
-		}
-		run.TimeElapsed = runResult
-		zlog.Info().Msg(fmt.Sprintf("Processed request: %s", runResult.String()))
-	}
-}
-
-func (p *Processor) processParallelMode() {
-	// TBD
-}
-
-func (p *Processor) exportTestResult(runs []*Run) {
-	file, err := os.Create(p.Config.OutputPath)
+	err = p.exportTestResult(inputRuns)
 	if err != nil {
-		zlog.Error().Err(err).Msg("unable to create output file")
-		return
+		return fmt.Errorf("failed to export test results: %w", err)
 	}
 
-	defer file.Close()
+	aggregator := NewAggregator(inputRuns.Runs)
+	aggregator.PrintPercentiles(p.Config.Percentiles)
 
-	w := csv.NewWriter(file)
-	defer w.Flush()
+	return nil
+}
 
-	if err = w.Write([]string{"database", "version", "query", "elapsed time"}); err != nil {
-		zlog.Error().Err(err).Msg("failed to write headers")
-		return
+func (p *Processor) exportTestResult(runs *runs.Data) error {
+	outputFile, err := os.Create(p.Config.OutputPath)
+	if err != nil {
+		return fmt.Errorf("unable to create output file: %w", err)
 	}
 
-	for _, run := range runs {
-		if err = w.Write(run.CsvRow()); err != nil {
-			zlog.Error().Err(err).Msg("failed to write run's data")
-			return
-		}
+	defer outputFile.Close()
+
+	yamlFile, err := yaml.Marshal(runs)
+	if err != nil {
+		return fmt.Errorf("failed to marshal runs to yaml: %w", err)
 	}
+
+	_, err = outputFile.WriteString(string(yamlFile))
+	if err != nil {
+		return fmt.Errorf("failed to write data to output file: %w", err)
+	}
+
+	return nil
 }

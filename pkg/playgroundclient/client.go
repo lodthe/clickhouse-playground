@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"clickhouse-playground/pkg/restapi"
 )
 
 type Config struct {
@@ -18,19 +20,8 @@ type PlaygroundClient struct {
 	client  *http.Client
 }
 
-type PostRunsRequest struct {
-	Database    string `json:"database"`
-	Version     string `json:"version"`
-	Query       string `json:"query"`
-	SaveRunInfo bool   `json:"save_run_info"`
-}
-
 type PostRunsResponse struct {
-	Result PostRunsResult `json:"result"`
-}
-
-type PostRunsResult struct {
-	TimeElapsed string `json:"time_elapsed"`
+	Result restapi.RunQueryOutput `json:"result"`
 }
 
 func New(c *Config) *PlaygroundClient {
@@ -43,7 +34,7 @@ func New(c *Config) *PlaygroundClient {
 func (c *PlaygroundClient) PostRuns(database string, version string, query string) (time.Duration, error) {
 	url := c.baseURL + "/api/runs"
 
-	requestBody := PostRunsRequest{
+	requestBody := restapi.RunQueryInput{
 		Database:    database,
 		Version:     version,
 		Query:       query,
