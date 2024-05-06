@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var UnknownModeError = errors.New("unknown mode")
+var ErrUnknownMode = errors.New("unknown mode")
 
 type Config struct {
 	Mode         runsprocessors.Mode
@@ -63,7 +63,7 @@ func (p *Processor) Process(playgroundClient PlaygroundClient) error {
 	case runsprocessors.ParallelMode:
 		runsProcessor = runsprocessors.NewParallelModeProcessor(playgroundClient)
 	default:
-		return UnknownModeError
+		return ErrUnknownMode
 	}
 
 	runsProcessor.Process(inputRuns)

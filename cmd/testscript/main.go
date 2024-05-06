@@ -4,6 +4,7 @@ import (
 	"clickhouse-playground/internal/testprocessor"
 	"clickhouse-playground/internal/testprocessor/runs"
 	"clickhouse-playground/pkg/playgroundclient"
+
 	"flag"
 	"fmt"
 	"time"
@@ -57,10 +58,7 @@ func main() {
 				"You can specify output csv file path by setting \"output_path\" argument in config")
 			return
 		}
-		err = runTest(config)
-		if err != nil {
-			fmt.Println("Error while running test script: %w", err)
-		}
+		runTest(config)
 	case ImportRuns:
 		if needHelp {
 			fmt.Println("Imports runs data from DynamoDB with given time borders.\n\n" +
@@ -116,7 +114,7 @@ func main() {
 	}
 }
 
-func runTest(config *Config) error {
+func runTest(config *Config) {
 	playgroundClient := playgroundclient.New(&playgroundclient.Config{
 		BaseURL: config.Playground.BaseURL,
 	})
@@ -133,6 +131,4 @@ func runTest(config *Config) error {
 	if err != nil {
 		fmt.Printf("Failed to process test script: %s\n", err)
 	}
-
-	return nil
 }

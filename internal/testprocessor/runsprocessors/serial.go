@@ -21,8 +21,8 @@ func (p *SerialRunsProcessor) Mode() Mode {
 	return SerialMode
 }
 
-func (p *SerialRunsProcessor) Process(runs *runs.Data) {
-	for i, run := range runs.Runs {
+func (p *SerialRunsProcessor) Process(runsData *runs.Data) {
+	for i, run := range runsData.Runs {
 		runResult, err := p.playgroundClient.PostRuns(run.Database, run.Version, run.Query)
 		if err != nil {
 			fmt.Printf("Received error from playground client: %s\n", err)
@@ -30,8 +30,8 @@ func (p *SerialRunsProcessor) Process(runs *runs.Data) {
 		run.TimeElapsed = &runResult
 		fmt.Printf("Processed request with result: %s\n", runResult.String())
 
-		if i != len(runs.Runs)-1 {
-			nextRequestTime := runs.Runs[i+1].Timestamp
+		if i != len(runsData.Runs)-1 {
+			nextRequestTime := runsData.Runs[i+1].Timestamp
 			sleepDelta := nextRequestTime.Sub(run.Timestamp)
 			time.Sleep(sleepDelta)
 		}

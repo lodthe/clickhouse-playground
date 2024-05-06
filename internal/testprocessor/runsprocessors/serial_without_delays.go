@@ -20,8 +20,8 @@ func (p *SerialWithoutDelaysRunsProcessor) Mode() Mode {
 	return SerialWithoutDelaysMode
 }
 
-func (p *SerialWithoutDelaysRunsProcessor) Process(runs *runs.Data) {
-	for _, run := range runs.Runs {
+func (p *SerialWithoutDelaysRunsProcessor) Process(runsData *runs.Data) {
+	for _, run := range runsData.Runs {
 		runResult, err := p.playgroundClient.PostRuns(run.Database, run.Version, run.Query)
 		if err != nil {
 			fmt.Println("Received error from playground client: %w", err)
