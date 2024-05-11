@@ -7,6 +7,9 @@ import (
 
 	"clickhouse-playground/internal/testprocessor/runs"
 	"clickhouse-playground/internal/testprocessor/runsprocessors"
+	parallelprocessor "clickhouse-playground/internal/testprocessor/runsprocessors/parallel"
+	serialprocessor "clickhouse-playground/internal/testprocessor/runsprocessors/serial"
+	serialwdprocessor "clickhouse-playground/internal/testprocessor/runsprocessors/serial-without-delays"
 
 	"gopkg.in/yaml.v3"
 
@@ -56,12 +59,12 @@ func (p *Processor) Process(playgroundClient PlaygroundClient) error {
 	var runsProcessor RunsProcessor
 
 	switch p.Config.Mode {
-	case runsprocessors.SerialMode:
-		runsProcessor = runsprocessors.NewSerialModeProcessor(playgroundClient)
-	case runsprocessors.SerialWithoutDelaysMode:
-		runsProcessor = runsprocessors.NewSerialWithoutDelaysModeProcessor(playgroundClient)
-	case runsprocessors.ParallelMode:
-		runsProcessor = runsprocessors.NewParallelModeProcessor(playgroundClient)
+	case serialprocessor.Mode:
+		runsProcessor = serialprocessor.New(playgroundClient)
+	case serialwdprocessor.Mode:
+		runsProcessor = serialwdprocessor.New(playgroundClient)
+	case parallelprocessor.Mode:
+		runsProcessor = parallelprocessor.New(playgroundClient)
 	default:
 		return ErrUnknownMode
 	}

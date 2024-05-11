@@ -1,27 +1,28 @@
-package runsprocessors
+package serial
 
 import (
+	"clickhouse-playground/internal/testprocessor/runsprocessors"
 	"fmt"
 	"time"
 
 	"clickhouse-playground/internal/testprocessor/runs"
 )
 
-const SerialMode Mode = "serial"
+const Mode runsprocessors.Mode = "serial"
 
-type SerialRunsProcessor struct {
-	playgroundClient PlaygroundClient
+type Processor struct {
+	playgroundClient runsprocessors.PlaygroundClient
 }
 
-func NewSerialModeProcessor(playgroundClient PlaygroundClient) *SerialRunsProcessor {
-	return &SerialRunsProcessor{playgroundClient: playgroundClient}
+func New(playgroundClient runsprocessors.PlaygroundClient) *Processor {
+	return &Processor{playgroundClient: playgroundClient}
 }
 
-func (p *SerialRunsProcessor) Mode() Mode {
-	return SerialMode
+func (p *Processor) Mode() runsprocessors.Mode {
+	return Mode
 }
 
-func (p *SerialRunsProcessor) Process(runsData *runs.Data) {
+func (p *Processor) Process(runsData *runs.Data) {
 	for i, run := range runsData.Runs {
 		runResult, err := p.playgroundClient.PostRuns(run.Database, run.Version, run.Query)
 		if err != nil {
