@@ -360,18 +360,26 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 	}
 
 	createdAt := time.Now()
-	debugLogger := r.logger.Debug().
-		Str("run_id", state.runID).
-		Str("image", state.imageFQN).
-		Str("container_id", cont.ID)
-	debugLogger.Dur("elapsed_ms", time.Since(invokedAt)).Msg("container has been created")
+
+	debugInfo := map[string]any{
+		"run_id":       state.runID,
+		"image":        state.imageFQN,
+		"container_id": cont.ID,
+	}
+	r.logger.Debug().
+		Fields(debugInfo).
+		Dur("elapsed_ms", time.Since(invokedAt)).
+		Msg("container has been created")
 
 	err = r.engine.startContainer(ctx, cont.ID)
 	if err != nil {
 		return errors.Wrap(err, "container cannot be started")
 	}
 
-	debugLogger.Dur("elapsed_ms", time.Since(createdAt)).Msg("container has been started")
+	r.logger.Debug().
+		Fields(debugInfo).
+		Dur("elapsed_ms", time.Since(createdAt)).
+		Msg("container has been started")
 
 	state.containerID = cont.ID
 

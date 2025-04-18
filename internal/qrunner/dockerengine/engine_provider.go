@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	dockercli "github.com/docker/docker/client"
 	"github.com/pkg/errors"
 )
@@ -84,14 +85,14 @@ func (p *engineProvider) ownershipLabelFilter() (key, value string) {
 }
 
 func (p *engineProvider) pullImage(ctx context.Context, imageTag string) (io.ReadCloser, error) {
-	return p.cli.ImagePull(ctx, imageTag, types.ImagePullOptions{})
+	return p.cli.ImagePull(ctx, imageTag, image.PullOptions{})
 }
 
 func (p *engineProvider) addImageTag(ctx context.Context, existingImageTag, newImageTag string) error {
 	return p.cli.ImageTag(ctx, existingImageTag, newImageTag)
 }
 
-func (p *engineProvider) getImageByID(ctx context.Context, id string) (types.ImageInspect, error) {
+func (p *engineProvider) getImageByID(ctx context.Context, id string) (image.InspectResponse, error) {
 	inspect, _, err := p.cli.ImageInspectWithRaw(ctx, id)
 
 	return inspect, err
@@ -99,8 +100,8 @@ func (p *engineProvider) getImageByID(ctx context.Context, id string) (types.Ima
 
 // getImages returns existing images.
 // If filterChp is true, only created by the playground images are returned.s
-func (p *engineProvider) getImages(ctx context.Context, filterChp bool) ([]types.ImageSummary, error) {
-	images, err := p.cli.ImageList(ctx, types.ImageListOptions{
+func (p *engineProvider) getImages(ctx context.Context, filterChp bool) ([]image.Summary, error) {
+	images, err := p.cli.ImageList(ctx, image.ListOptions{
 		All: true,
 	})
 
@@ -128,8 +129,8 @@ func (p *engineProvider) getImages(ctx context.Context, filterChp bool) ([]types
 	return images, nil
 }
 
-func (p *engineProvider) removeImage(ctx context.Context, tag string, pruneChildren bool) ([]types.ImageDeleteResponseItem, error) {
-	return p.cli.ImageRemove(ctx, tag, types.ImageRemoveOptions{
+func (p *engineProvider) removeImage(ctx context.Context, tag string, pruneChildren bool) ([]image.DeleteResponse, error) {
+	return p.cli.ImageRemove(ctx, tag, image.RemoveOptions{
 		PruneChildren: pruneChildren,
 	})
 }
@@ -139,7 +140,7 @@ func (p *engineProvider) createContainer(ctx context.Context, config *container.
 }
 
 func (p *engineProvider) startContainer(ctx context.Context, id string) error {
-	return p.cli.ContainerStart(ctx, id, types.ContainerStartOptions{})
+	return p.cli.ContainerStart(ctx, id, container.StartOptions{})
 }
 
 func (p *engineProvider) pauseContainer(ctx context.Context, id string) error {
@@ -153,7 +154,7 @@ func (p *engineProvider) unpauseContainer(ctx context.Context, id string) error 
 // exec executes the given command in the container and attaches to it.
 // Keep in mind that you have to close the returned response.
 func (p *engineProvider) exec(ctx context.Context, containerID string, cmd []string) (types.HijackedResponse, error) {
-	exec, err := p.cli.ContainerExecCreate(ctx, containerID, types.ExecConfig{
+	exec, err := p.cli.ContainerExecCreate(ctx, containerID, container.ExecOptions{
 		AttachStderr: true,
 		AttachStdout: true,
 		Cmd:          cmd,
@@ -162,7 +163,7 @@ func (p *engineProvider) exec(ctx context.Context, containerID string, cmd []str
 		return types.HijackedResponse{}, errors.Wrap(err, "exec create failed")
 	}
 
-	resp, err := p.cli.ContainerExecAttach(ctx, exec.ID, types.ExecStartCheck{})
+	resp, err := p.cli.ContainerExecAttach(ctx, exec.ID, container.ExecStartOptions{})
 	if err != nil {
 		return types.HijackedResponse{}, errors.Wrap(err, "exec attach failed")
 	}
@@ -170,8 +171,8 @@ func (p *engineProvider) exec(ctx context.Context, containerID string, cmd []str
 	return resp, nil
 }
 
-func (p *engineProvider) getContainers(ctx context.Context) ([]types.Container, error) {
-	return p.cli.ContainerList(ctx, types.ContainerListOptions{
+func (p *engineProvider) getContainers(ctx context.Context) ([]container.Summary, error) {
+	return p.cli.ContainerList(ctx, container.ListOptions{
 		Size:    true,
 		All:     true,
 		Limit:   -1,
@@ -180,12 +181,12 @@ func (p *engineProvider) getContainers(ctx context.Context) ([]types.Container, 
 }
 
 func (p *engineProvider) removeContainer(ctx context.Context, id string) error {
-	return p.cli.ContainerRemove(ctx, id, types.ContainerRemoveOptions{
+	return p.cli.ContainerRemove(ctx, id, container.RemoveOptions{
 		RemoveVolumes: true,
 		Force:         true,
 	})
 }
 
-func (p *engineProvider) pruneContainers(ctx context.Context) (types.ContainersPruneReport, error) {
+func (p *engineProvider) pruneContainers(ctx context.Context) (container.PruneReport, error) {
 	return p.cli.ContainersPrune(ctx, filters.NewArgs(filters.Arg(p.ownershipLabelFilter())))
 }

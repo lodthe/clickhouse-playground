@@ -17,6 +17,8 @@ type containerRunner interface {
 	createContainer(ctx context.Context, state *requestState) error
 }
 
+// prewarmer predicts which image tags will be requested to start a container
+// and starts them in advance.
 type prewarmer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
