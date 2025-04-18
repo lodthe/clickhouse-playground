@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"clickhouse-playground/pkg/chspec"
-	"clickhouse-playground/pkg/dockerhub"
+	"github.com/lodthe/clickhouse-playground/pkg/chspec"
+	"github.com/lodthe/clickhouse-playground/pkg/dockerhub"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"

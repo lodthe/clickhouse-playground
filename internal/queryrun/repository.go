@@ -3,8 +3,8 @@ package queryrun
 import (
 	"context"
 
-	"clickhouse-playground/internal/dbsettings"
-	"clickhouse-playground/internal/dbsettings/runsettings"
+	"github.com/lodthe/clickhouse-playground/internal/dbsettings"
+	"github.com/lodthe/clickhouse-playground/internal/dbsettings/runsettings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"

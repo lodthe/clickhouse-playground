@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"clickhouse-playground/internal/dbsettings/runsettings"
-	"clickhouse-playground/internal/dockertag"
-	"clickhouse-playground/internal/queryrun"
+	"github.com/lodthe/clickhouse-playground/internal/dbsettings/runsettings"
+	"github.com/lodthe/clickhouse-playground/internal/dockertag"
+	"github.com/lodthe/clickhouse-playground/internal/queryrun"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"

@@ -1,7 +1,7 @@
 package dockerengine
 
 import (
-	"clickhouse-playground/internal/dbsettings/runsettings"
+	"github.com/lodthe/clickhouse-playground/internal/dbsettings/runsettings"
 )
 
 // requestState holds information about a processing query execution request.

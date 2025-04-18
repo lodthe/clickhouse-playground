@@ -1,8 +1,8 @@
 package runsettings
 
 import (
-	"clickhouse-playground/internal/dbsettings"
-	"clickhouse-playground/pkg/chspec"
+	"github.com/lodthe/clickhouse-playground/internal/dbsettings"
+	"github.com/lodthe/clickhouse-playground/pkg/chspec"
 )
 
 // ClickHouseSettings contains settings for clickhouse client

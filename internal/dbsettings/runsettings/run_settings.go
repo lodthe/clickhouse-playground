@@ -1,6 +1,6 @@
 package runsettings
 
-import "clickhouse-playground/internal/dbsettings"
+import "github.com/lodthe/clickhouse-playground/internal/dbsettings"
 
 // RunSettings interface define custom settings for different databases
 type RunSettings interface {

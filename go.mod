@@ -1,4 +1,4 @@
-module clickhouse-playground
+module github.com/lodthe/clickhouse-playground
 
 go 1.24
 

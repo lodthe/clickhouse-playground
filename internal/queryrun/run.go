@@ -3,7 +3,7 @@ package queryrun
 import (
 	"time"
 
-	"clickhouse-playground/internal/dbsettings/runsettings"
+	"github.com/lodthe/clickhouse-playground/internal/dbsettings/runsettings"
 
 	"github.com/google/uuid"
 )

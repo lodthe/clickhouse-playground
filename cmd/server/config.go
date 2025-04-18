@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"clickhouse-playground/internal/dockertag"
-	"clickhouse-playground/internal/qrunner/coordinator"
+	"github.com/lodthe/clickhouse-playground/internal/dockertag"
+	"github.com/lodthe/clickhouse-playground/internal/qrunner/coordinator"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	gconfig "github.com/gookit/config/v2"

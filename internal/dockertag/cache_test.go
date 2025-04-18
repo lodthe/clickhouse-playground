@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"clickhouse-playground/pkg/dockerhub"
+	"github.com/lodthe/clickhouse-playground/pkg/dockerhub"
 
 	"github.com/pkg/errors"
 	zlog "github.com/rs/zerolog/log"

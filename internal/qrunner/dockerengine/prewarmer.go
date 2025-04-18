@@ -1,11 +1,12 @@
 package dockerengine
 
 import (
-	"clickhouse-playground/internal/metrics"
 	"context"
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/lodthe/clickhouse-playground/internal/metrics"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"

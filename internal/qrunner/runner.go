@@ -3,7 +3,7 @@ package qrunner
 import (
 	"context"
 
-	"clickhouse-playground/internal/queryrun"
+	"github.com/lodthe/clickhouse-playground/internal/queryrun"
 )
 
 type Runner interface {
