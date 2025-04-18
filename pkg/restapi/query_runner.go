@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"clickhouse-playground/internal/database/runsettings"
+	"clickhouse-playground/internal/dbsettings/runsettings"
 	"clickhouse-playground/internal/qrunner"
 	"clickhouse-playground/internal/queryrun"
 

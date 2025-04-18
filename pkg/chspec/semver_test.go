@@ -1,4 +1,4 @@
-package chsemver
+package chspec
 
 import (
 	"fmt"

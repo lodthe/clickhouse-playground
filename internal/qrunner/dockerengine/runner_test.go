@@ -2,11 +2,12 @@ package dockerengine
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"clickhouse-playground/internal/database/runsettings"
+	"clickhouse-playground/internal/dbsettings/runsettings"
 	"clickhouse-playground/internal/dockertag"
 	"clickhouse-playground/internal/queryrun"
 
@@ -30,6 +31,10 @@ func (t tagStorageMock) Find(version string) (dockertag.Image, bool) {
 }
 
 func TestCustomSettings(t *testing.T) {
+	if os.Getenv("RUN_DOCKER_TESTS") != "true" {
+		t.Skip("Skipping a docker test. Set RUN_DOCKER_TESTS=true to enable.")
+	}
+
 	ctx := context.Background()
 	logger := zlog.Logger.Level(zerolog.ErrorLevel)
 

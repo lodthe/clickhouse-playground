@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"clickhouse-playground/internal/qrunner"
-
 	"github.com/docker/cli/cli/connhelper"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -82,7 +80,7 @@ func (p *engineProvider) ping(ctx context.Context) error {
 }
 
 func (p *engineProvider) ownershipLabelFilter() (key, value string) {
-	return "label", qrunner.LabelOwnership
+	return "label", LabelOwnership
 }
 
 func (p *engineProvider) pullImage(ctx context.Context, imageTag string) (io.ReadCloser, error) {
@@ -113,7 +111,7 @@ func (p *engineProvider) getImages(ctx context.Context, filterChp bool) ([]types
 	for i := 0; i < len(images); i++ {
 		var matched bool
 		for _, tag := range images[i].RepoTags {
-			if qrunner.IsPlaygroundImageName(tag) {
+			if IsPlaygroundImageName(tag) {
 				matched = true
 				break
 			}

@@ -1,4 +1,4 @@
-package qrunner
+package dockerengine
 
 // LabelOwnership is set for all containers created by clickhouse-playground.
 // Use it to find hanged up containers for garbage collection.
