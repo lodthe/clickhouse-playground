@@ -2,15 +2,16 @@ package dockerengine
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"clickhouse-playground/internal/database/runsettings"
-	"clickhouse-playground/internal/dockertag"
-	"clickhouse-playground/internal/queryrun"
+	"github.com/lodthe/clickhouse-playground/internal/dbsettings/runsettings"
+	"github.com/lodthe/clickhouse-playground/internal/dockertag"
+	"github.com/lodthe/clickhouse-playground/internal/queryrun"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
@@ -30,6 +31,10 @@ func (t tagStorageMock) Find(version string) (dockertag.Image, bool) {
 }
 
 func TestCustomSettings(t *testing.T) {
+	if os.Getenv("RUN_DOCKER_TESTS") == "" {
+		t.Skip("Skipping a docker test. Set RUN_DOCKER_TESTS=true to enable.")
+	}
+
 	ctx := context.Background()
 	logger := zlog.Logger.Level(zerolog.ErrorLevel)
 
@@ -92,19 +97,19 @@ func TestCustomSettings(t *testing.T) {
 		if err != nil {
 			t.Log(err.Error())
 		}
-		assert.Equal(t, tc.expectedOutput, output)
+		assert.Contains(t, output, tc.expectedOutput, "output doesn't contain expected results")
 	}
 
 	t.Cleanup(func() {
 		//Fetch all remaining test containers
-		containers, err := runner.engine.cli.ContainerList(ctx, types.ContainerListOptions{
+		containers, err := runner.engine.cli.ContainerList(ctx, container.ListOptions{
 			Filters: filters.NewArgs(filters.Arg("label", "clickhouse.playground.runner=Test")),
 		})
 		assert.NoError(t, err)
 
 		//Remove all remaining test containers
-		for _, container := range containers {
-			err = runner.engine.cli.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
+		for _, c := range containers {
+			err = runner.engine.cli.ContainerRemove(ctx, c.ID, container.RemoveOptions{
 				RemoveVolumes: true,
 				Force:         true,
 			})

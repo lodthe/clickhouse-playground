@@ -1,11 +1,12 @@
 package dockerengine
 
 import (
-	"clickhouse-playground/internal/metrics"
 	"context"
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/lodthe/clickhouse-playground/internal/metrics"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -17,6 +18,8 @@ type containerRunner interface {
 	createContainer(ctx context.Context, state *requestState) error
 }
 
+// prewarmer predicts which image tags will be requested to start a container
+// and starts them in advance.
 type prewarmer struct {
 	ctx    context.Context
 	cancel context.CancelFunc

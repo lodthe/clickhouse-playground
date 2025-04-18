@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"clickhouse-playground/internal/qrunner"
-	"clickhouse-playground/internal/queryrun"
+	"github.com/lodthe/clickhouse-playground/internal/qrunner"
+	"github.com/lodthe/clickhouse-playground/internal/queryrun"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"

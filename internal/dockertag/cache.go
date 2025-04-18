@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"clickhouse-playground/pkg/chsemver"
-	"clickhouse-playground/pkg/dockerhub"
+	"github.com/lodthe/clickhouse-playground/pkg/chspec"
+	"github.com/lodthe/clickhouse-playground/pkg/dockerhub"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -292,15 +292,15 @@ func (c *Cache) sortImages(imgByTag map[string]Image) []Image {
 	sortedImages := make([]Image, 0, len(seenHeadOfList)+len(images))
 
 	// Split a tag by '.' and save this representation to use it in comparator.
-	parsed := make([]chsemver.Semver, len(images))
+	parsed := make([]chspec.Semver, len(images))
 	ids := make([]int, len(images))
 	for id, img := range images {
-		parsed[id] = chsemver.Parse(img.Tag)
+		parsed[id] = chspec.Parse(img.Tag)
 		ids[id] = id
 	}
 
 	sort.Slice(ids, func(i, j int) bool {
-		return chsemver.IsGreater(parsed[ids[i]], parsed[ids[j]])
+		return chspec.IsGreater(parsed[ids[i]], parsed[ids[j]])
 	})
 
 	// At first, head of list images must be added.

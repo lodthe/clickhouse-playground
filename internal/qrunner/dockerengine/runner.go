@@ -9,12 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"clickhouse-playground/internal/database"
-	"clickhouse-playground/internal/database/runsettings"
-	"clickhouse-playground/internal/dockertag"
-	"clickhouse-playground/internal/metrics"
-	"clickhouse-playground/internal/qrunner"
-	"clickhouse-playground/internal/queryrun"
+	"github.com/lodthe/clickhouse-playground/internal/dbsettings"
+	"github.com/lodthe/clickhouse-playground/internal/dbsettings/runsettings"
+	"github.com/lodthe/clickhouse-playground/internal/dockertag"
+	"github.com/lodthe/clickhouse-playground/internal/metrics"
+	"github.com/lodthe/clickhouse-playground/internal/qrunner"
+	"github.com/lodthe/clickhouse-playground/internal/queryrun"
+	"github.com/lodthe/clickhouse-playground/pkg/chspec"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -212,8 +213,8 @@ func (r *Runner) constructImageFQN(version string) (imageTag string, imageFQN st
 		return "", "", errors.New("version not found")
 	}
 
-	imageTag = qrunner.FullImageName(img.Repository, version)
-	imageFQN = qrunner.PlaygroundImageName(img.Repository, img.Digest)
+	imageTag = FullImageName(img.Repository, version)
+	imageFQN = PlaygroundImageName(img.Repository, img.Digest)
 
 	return imageTag, imageFQN, nil
 }
@@ -315,7 +316,7 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 
 	contConfig := &container.Config{
 		Image:  state.imageFQN,
-		Labels: qrunner.CreateContainerLabels(r.name, state.runID, state.version),
+		Labels: CreateContainerLabels(r.name, state.runID, state.version),
 	}
 
 	var networkMode string
@@ -359,18 +360,26 @@ func (r *Runner) runContainer(ctx context.Context, state *requestState) (err err
 	}
 
 	createdAt := time.Now()
-	debugLogger := r.logger.Debug().
-		Str("run_id", state.runID).
-		Str("image", state.imageFQN).
-		Str("container_id", cont.ID)
-	debugLogger.Dur("elapsed_ms", time.Since(invokedAt)).Msg("container has been created")
+
+	debugInfo := map[string]any{
+		"run_id":       state.runID,
+		"image":        state.imageFQN,
+		"container_id": cont.ID,
+	}
+	r.logger.Debug().
+		Fields(debugInfo).
+		Dur("elapsed_ms", time.Since(invokedAt)).
+		Msg("container has been created")
 
 	err = r.engine.startContainer(ctx, cont.ID)
 	if err != nil {
 		return errors.Wrap(err, "container cannot be started")
 	}
 
-	debugLogger.Dur("elapsed_ms", time.Since(createdAt)).Msg("container has been started")
+	r.logger.Debug().
+		Fields(debugInfo).
+		Dur("elapsed_ms", time.Since(createdAt)).
+		Msg("container has been started")
 
 	state.containerID = cont.ID
 
@@ -386,7 +395,7 @@ func (r *Runner) execQuery(ctx context.Context, state *requestState) (stdout str
 	var args []string
 
 	switch state.settings.Type() {
-	case database.TypeClickHouse:
+	case dbsettings.TypeClickHouse:
 		args = []string{
 			"clickhouse", "client",
 			"-n",
@@ -450,7 +459,7 @@ func (r *Runner) runQuery(ctx context.Context, state *requestState) (output stri
 			return "", err
 		}
 
-		if qrunner.CheckIfClickHouseIsReady(stderr) {
+		if chspec.CheckIfClickHouseIsReady(stderr) {
 			r.logger.Debug().Str("run_id", state.runID).Msg("query has been executed")
 			break
 		}

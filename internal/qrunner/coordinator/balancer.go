@@ -46,7 +46,7 @@ func (b *balancer) add(r *Runner) bool {
 	return true
 }
 
-// add excludes a runner from load balancing.
+// remove excludes a runner from load balancing.
 func (b *balancer) remove(r *Runner) {
 	b.lock.Lock()
 	defer b.lock.Unlock()

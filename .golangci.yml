@@ -81,7 +81,7 @@ linters:
 run:
   skip-dirs:
     - .infra
-  go: "1.21"
+  go: "1.24"
 issues:
   exclude-rules:
     - linters:

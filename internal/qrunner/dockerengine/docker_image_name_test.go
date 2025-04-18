@@ -1,4 +1,4 @@
-package qrunner
+package dockerengine
 
 import (
 	"testing"

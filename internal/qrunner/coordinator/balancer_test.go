@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"clickhouse-playground/internal/qrunner/stubrunner"
+	"github.com/lodthe/clickhouse-playground/internal/qrunner/stubrunner"
 
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"

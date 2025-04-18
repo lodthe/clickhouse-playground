@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"clickhouse-playground/internal/metrics"
+	"github.com/lodthe/clickhouse-playground/internal/metrics"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"

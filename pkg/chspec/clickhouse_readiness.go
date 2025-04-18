@@ -1,4 +1,4 @@
-package qrunner
+package chspec
 
 import "strings"
 

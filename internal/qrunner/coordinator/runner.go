@@ -3,7 +3,7 @@ package coordinator
 import (
 	"sync/atomic"
 
-	"clickhouse-playground/internal/qrunner"
+	"github.com/lodthe/clickhouse-playground/internal/qrunner"
 )
 
 const DefaultWeight = 100
