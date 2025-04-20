@@ -1,0 +1,256 @@
+openapi: 3.1.0
+info:
+  title: ClickHouse Playground API
+  description: API for ClickHouse Playground - an online service to run SQL queries directly from a browser
+  version: 1.0.0
+  contact:
+    name: ClickHouse Playground
+servers:
+  - url: https://fiddle.clickhouse.com/api
+    description: Production server
+
+paths:
+  /tags:
+    get:
+      summary: Get available ClickHouse version tags
+      description: Returns a list of available ClickHouse version tags that can be used for running queries
+      operationId: getImageTags
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetImageTagsResponse'
+
+  /runs:
+    post:
+      summary: Run a ClickHouse SQL query
+      description: Executes a SQL query against a specified ClickHouse version
+      operationId: runQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunQueryRequest'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunQueryResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                emptyQuery:
+                  value:
+                    error:
+                      message: query cannot be empty
+                      code: 400
+                unknownVersion:
+                  value:
+                    error:
+                      message: unknown version
+                      code: 400
+                queryTooLong:
+                  value:
+                    error:
+                      message: query length (10000) cannot exceed 8192
+                      code: 400
+                outputTooLong:
+                  value:
+                    error:
+                      message: output length (10000) cannot exceed 8192
+                      code: 400
+                unknownDatabase:
+                  value:
+                    error:
+                      message: unknown database
+                      code: 400
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  message: no available runners
+                  code: 429
+
+  /runs/{id}:
+    get:
+      summary: Get a specific query run
+      description: Returns details about a previously executed query run
+      operationId: getQueryRun
+      parameters:
+        - name: id
+          in: path
+          description: ID of the query run
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetQueryRunResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  message: missed id
+                  code: 400
+        '404':
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  message: run not found
+                  code: 404
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+      required:
+        - error
+
+    ErrorDetail:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Human-readable error message
+        code:
+          type: integer
+          description: HTTP status code or custom error code
+      required:
+        - message
+        - code
+
+    GetImageTagsResponse:
+      type: object
+      properties:
+        result:
+          type: object
+          properties:
+            tags:
+              type: array
+              items:
+                type: string
+              description: List of available ClickHouse version tags
+          required:
+            - tags
+      required:
+        - result
+
+    RunQueryRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          description: SQL query to execute
+        version:
+          type: string
+          description: ClickHouse version tag to use
+        database:
+          type: string
+          description: Database type (defaults to "clickhouse" if not specified)
+          default: clickhouse
+          enum:
+            - clickhouse
+        settings:
+          type: object
+          properties:
+            clickhouse:
+              type: object
+              properties:
+                output_format:
+                  type: string
+                  description: Output format for ClickHouse query results
+      required:
+        - query
+        - version
+
+    RunQueryResponse:
+      type: object
+      properties:
+        result:
+          type: object
+          properties:
+            query_run_id:
+              type: string
+              format: uuid
+              description: Unique identifier for the query run
+            output:
+              type: string
+              description: Query execution output
+            time_elapsed:
+              type: string
+              description: Time taken to execute the query
+          required:
+            - query_run_id
+            - output
+            - time_elapsed
+      required:
+        - result
+
+    GetQueryRunResponse:
+      type: object
+      properties:
+        result:
+          type: object
+          properties:
+            query_run_id:
+              type: string
+              format: uuid
+              description: Unique identifier for the query run
+            database:
+              type: string
+              description: Database type used for the query
+            version:
+              type: string
+              description: ClickHouse version tag used for the query
+            settings:
+              type: object
+              description: Settings used for the query run
+              properties:
+                clickhouse:
+                  type: object
+                  properties:
+                    output_format:
+                      type: string
+                      description: Output format used for the query results
+            input:
+              type: string
+              description: The SQL query that was executed
+            output:
+              type: string
+              description: Query execution output
+          required:
+            - query_run_id
+            - version
+            - input
+            - output
+      required:
+        - result
