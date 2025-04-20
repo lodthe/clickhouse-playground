@@ -1,64 +1,11 @@
-linters-settings:
-  govet:
-    check-shadowing: false
-    settings:
-      printf:
-        funcs: # TODO:
-        # - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
-  golint:
-    min-confidence: 0
-  gocyclo:
-    min-complexity: 15
-  maligned:
-    suggest-new: true
-  dupl:
-    threshold: 100
-  misspell:
-    locale: US
-  lll:
-    line-length: 140
-  goimports:
-    local-prefixes: github.com/lodthe/clickhouse-playground
-  gocritic: # TODO:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport # https://github.com/go-critic/go-critic/issues/845
-      - ifElseChain # TODO
-      - octalLiteral # TODO
-      - whyNoLint # TODO
-      - wrapperFunc # TODO
-      - paramTypeCombine
-      - hugeParam
-      - rangeValCopy
-  gomnd:
-    settings:
-      mnd:
-        # the list of enabled checks, see https://github.com/tommy-muehle/go-mnd/#checks for description.
-        checks: argument,case,condition,operation,return,assign
-  funlen:
-    lines: 100
-    statements: 50
-  godox:
-    keywords:
-      - OPTIMIZE # marks code that should be optimized before merging
-      - FIXME # marks code that should be fixed before merging
-      - HACK # marks hack-arounds that should be removed before merging
-
+version: "2"
+# linters-settings:
+  
 linters:
-  # please, do not use `enable-all`: it's deprecated and will be removed soon.
-  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
-  disable-all: true
   enable:
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - typecheck
     - unused
     - bodyclose
     - dogsled
@@ -66,35 +13,115 @@ linters:
     - goconst
     - gocritic
     - godox
-    - gofmt
-    - goimports
-    - revive
     - gosec
     - nakedret
-    - exportloopref
     - unconvert
     - unparam
     - whitespace
     - dupl
     - misspell
+    - revive
+  disable:
+    - errcheck
+  settings:
+    govet:
+      settings:
+        printf:
+          funcs: # TODO:
+          # - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+    revive:
+      directives:
+        - name: specify-disable-reason
+          severity: error
+      rules:
+        - name: exported
+          disabled: true
+        - name: add-constant
+          severity: warning
+          disabled: false
+          exclude: [""]
+          arguments:
+            - max-lit-count: "3"
+              ignore-funcs: "os\\.*,fmt\\.Println,make"
+              allow-strs: '""'
+              allow-ints: "0,1,2,10,64,16,32"
+              allow-floats: "0.0,0.,1.0,1.,2.0,2."
+        - name: call-to-gc
+          severity: warning
+          disabled: false
+          exclude: [""]
+        # https://github.com/mgechev/revive/blob/HEAD/RULES_DESCRIPTIONS.md#cognitive-complexity
+        - name: cognitive-complexity
+          severity: warning
+          disabled: false
+          exclude: [""]
+          arguments: [ 15 ]
+        # https://github.com/mgechev/revive/blob/HEAD/RULES_DESCRIPTIONS.md#confusing-naming
+        - name: confusing-naming
+          severity: warning
+          disabled: false
+          exclude: [""]
+        # https://github.com/mgechev/revive/blob/HEAD/RULES_DESCRIPTIONS.md#confusing-results
+        - name: confusing-results
+          severity: warning
+          disabled: false
+          exclude: [""]
+        # https://github.com/mgechev/revive/blob/HEAD/RULES_DESCRIPTIONS.md#constant-logical-expr
+        - name: constant-logical-expr
+          severity: warning
+          disabled: false
+          exclude: [""]
+    dupl:
+      threshold: 100
+    misspell:
+      locale: US
+    lll:
+      line-length: 140
+    gocritic: # TODO:
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+      disabled-checks:
+        - dupImport # https://github.com/go-critic/go-critic/issues/845
+        - ifElseChain # TODO
+        - octalLiteral # TODO
+        - whyNoLint # TODO
+        - wrapperFunc # TODO
+        - paramTypeCombine
+        - hugeParam
+        - rangeValCopy
+    funlen:
+      lines: 100
+      statements: 50
+    godox:
+      keywords:
+        - OPTIMIZE # marks code that should be optimized before merging
+        - FIXME # marks code that should be fixed before merging
+        - HACK # marks hack-arounds that should be removed before merging
+    gosec:
+      excludes:
+        - G115
+
+  exclusions:
+    generated: lax
+    warn-unused: true
+    rules:
+      - path: main\.go
+        linters:
+          - revive
+      - path: config\.go
+        linters:
+          - revive
+      - path: _test\.go
+        linters:
+          - gocritic
+          - dupl
+          - unparam
+          - gosec
+          - revive
 
 run:
-  skip-dirs:
-    - .infra
   go: "1.24"
-issues:
-  exclude-rules:
-    - linters:
-        - gomnd
-      text: "Magic number: 1,"
-    - path: _test\.go
-      linters:
-        - gomnd
-        - gocritic
-        - gosec
-        - unparam
-
-service:
-  golangci-lint-version: 1.50.0 # use the fixed version to not introduce new linters unexpectedly
-  prepare:
-    - echo "here I can run custom commands, but no preparation needed for this repo"

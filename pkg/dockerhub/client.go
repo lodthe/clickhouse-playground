@@ -56,7 +56,7 @@ func (c *Client) GetTags(repository string) ([]ImageTag, error) {
 	return tags, nil
 }
 
-func (c *Client) getTags(url string) (*GetImageTagsResponse, error) {
+func (c *Client) getTags(url string) (*GetImageTagsResponse, error) { // nolint
 	c.rl.Take()
 
 	resp, err := c.cli.Get(url)

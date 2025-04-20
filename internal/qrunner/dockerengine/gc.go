@@ -7,7 +7,7 @@ import (
 
 	"github.com/lodthe/clickhouse-playground/internal/metrics"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
@@ -177,7 +177,7 @@ func (g *garbageCollector) collectImages() (count uint, spaceReclaimed uint64, e
 		return 0, 0, nil
 	}
 
-	detailed := make([]types.ImageInspect, 0, len(images))
+	detailed := make([]image.InspectResponse, 0, len(images))
 	for _, c := range images {
 		inspect, err := g.engine.getImageByID(g.ctx, c.ID)
 		if err != nil {
@@ -201,7 +201,7 @@ func (g *garbageCollector) collectImages() (count uint, spaceReclaimed uint64, e
 }
 
 // removeImages deletes all tags of the provided images.
-func (g *garbageCollector) removeImages(images []types.ImageInspect) (count uint, spaceReclaimed uint64) {
+func (g *garbageCollector) removeImages(images []image.InspectResponse) (count uint, spaceReclaimed uint64) {
 	for _, img := range images {
 		ok := true
 		for _, tag := range img.RepoTags {
