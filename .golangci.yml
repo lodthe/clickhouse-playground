@@ -42,6 +42,7 @@ linters:
           exclude: [""]
           arguments:
             - max-lit-count: "3"
+              ignore-funcs: "os\\.*,fmt\\.Println,make"
               allow-strs: '""'
               allow-ints: "0,1,2,10,64,16,32"
               allow-floats: "0.0,0.,1.0,1.,2.0,2."
