@@ -93,7 +93,7 @@ func (p *engineProvider) addImageTag(ctx context.Context, existingImageTag, newI
 }
 
 func (p *engineProvider) getImageByID(ctx context.Context, id string) (image.InspectResponse, error) {
-	inspect, _, err := p.cli.ImageInspectWithRaw(ctx, id)
+	inspect, err := p.cli.ImageInspect(ctx, id)
 
 	return inspect, err
 }

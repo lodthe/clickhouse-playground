@@ -116,7 +116,7 @@ func (r *Runner) Start() error {
 	r.workers.Add(1)
 	go func() {
 		defer r.workers.Done()
-		r.prewarmer.Start()
+		_ = r.prewarmer.Start()
 	}()
 
 	logCtx := r.logger.Info()
@@ -193,7 +193,7 @@ func (r *Runner) RunQuery(ctx context.Context, run *queryrun.Run) (output string
 		r.logger.Debug().Str("container_id", state.containerID).Msg("container has been force removed")
 	}()
 
-	output, err = r.runQuery(ctx, state)
+	output, err = r.runQueryWithContainer(ctx, state)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to run query")
 	}
@@ -444,7 +444,7 @@ func (r *Runner) execQuery(ctx context.Context, state *requestState) (stdout str
 	return outBuf.String(), errBuf.String(), nil
 }
 
-func (r *Runner) runQuery(ctx context.Context, state *requestState) (output string, err error) {
+func (r *Runner) runQueryWithContainer(ctx context.Context, state *requestState) (output string, err error) {
 	invokedAt := time.Now()
 	defer func() {
 		r.pipelineMetr.RunQuery(err == nil, state.version, invokedAt)

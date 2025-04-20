@@ -67,7 +67,7 @@ func (r *Repo) Get(id string) (*Run, error) {
 
 	// Done because UnmarshalMap can't unmarshal in interface{}
 	var databaseType dbsettings.Type
-	attributevalue.Unmarshal(out.Item["Database"], &databaseType)
+	_ = attributevalue.Unmarshal(out.Item["Database"], &databaseType)
 	// TODO: add switch-case in the future
 	if databaseType == dbsettings.TypeClickHouse {
 		run.Settings = &runsettings.ClickHouseSettings{}
