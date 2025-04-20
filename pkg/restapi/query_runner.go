@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"clickhouse-playground/internal/database/runsettings"
-	"clickhouse-playground/internal/qrunner"
-	"clickhouse-playground/internal/queryrun"
+	"github.com/lodthe/clickhouse-playground/internal/dbsettings/runsettings"
+	"github.com/lodthe/clickhouse-playground/internal/qrunner"
+	"github.com/lodthe/clickhouse-playground/internal/queryrun"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"clickhouse-playground/internal/metrics"
+	"github.com/lodthe/clickhouse-playground/internal/metrics"
 
 	"github.com/docker/docker/api/types"
 	"github.com/pkg/errors"

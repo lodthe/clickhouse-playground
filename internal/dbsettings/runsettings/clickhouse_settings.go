@@ -1,8 +1,8 @@
 package runsettings
 
 import (
-	"clickhouse-playground/internal/database"
-	"clickhouse-playground/pkg/chsemver"
+	"github.com/lodthe/clickhouse-playground/internal/dbsettings"
+	"github.com/lodthe/clickhouse-playground/pkg/chspec"
 )
 
 // ClickHouseSettings contains settings for clickhouse client
@@ -10,8 +10,8 @@ type ClickHouseSettings struct {
 	OutputFormat string `dynamodbav:"OutputFormat"`
 }
 
-func (cs *ClickHouseSettings) Type() database.Type {
-	return database.TypeClickHouse
+func (cs *ClickHouseSettings) Type() dbsettings.Type {
+	return dbsettings.TypeClickHouse
 }
 
 // FormatArgs gets args for custom output formatting
@@ -21,7 +21,7 @@ func (cs *ClickHouseSettings) FormatArgs(version string, defaultOutputFormat str
 	var result []string
 
 	// Check if database version supports --format flag
-	if chsemver.IsAtLeastMajor(version, "21") {
+	if chspec.IsAtLeastMajor(version, "21") {
 		outputFormat := defaultOutputFormat
 		if cs.OutputFormat != "" {
 			outputFormat = cs.OutputFormat

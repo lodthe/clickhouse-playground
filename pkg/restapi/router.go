@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"clickhouse-playground/internal/metrics"
-	"clickhouse-playground/internal/queryrun"
+	"github.com/lodthe/clickhouse-playground/internal/metrics"
+	"github.com/lodthe/clickhouse-playground/internal/queryrun"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
