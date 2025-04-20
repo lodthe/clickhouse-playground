@@ -25,17 +25,10 @@ linters:
     - errcheck
   settings:
     govet:
-      check-shadowing: false
       settings:
         printf:
           funcs: # TODO:
           # - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
-    golint:
-      min-confidence: 0
-    gocyclo:
-      min-complexity: 15
-    maligned:
-      suggest-new: true
     revive:
       directives:
         - name: specify-disable-reason
