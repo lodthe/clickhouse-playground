@@ -6,6 +6,13 @@ log_level: info
 
 # ClickHouse Docker image configuration.
 docker_image:
+  auth:
+    # Docker Hub Auth details are required to list all docker image tags.
+    # See more details here: https://github.com/docker/hub-feedback/issues/2484
+    # Reference on issuing a token:
+    # https://docs.docker.com/reference/api/hub/latest/#tag/authentication-api/operation/AuthCreateAccessToken
+    identifier: "" # Docker Hub Username
+    secret: "" # Docker Hub Personal Token
   repositories:
     - clickhouse/clickhouse-server
     - yandex/clickhouse-server

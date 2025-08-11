@@ -63,7 +63,13 @@ type Limits struct {
 	MaxOutputLength uint64 `mapstructure:"max_output_length"`
 }
 
+type DockerAuth struct {
+	Identifier string `mapstructure:"identifier"`
+	Secret     string `mapstructure:"secret"`
+}
+
 type DockerImage struct {
+	Auth                DockerAuth    `mapstructure:"auth"`
 	Repositories        []string      `mapstructure:"repositories"`
 	OS                  string        `mapstructure:"os"`
 	Architecture        string        `mapstructure:"architecture"`
@@ -220,6 +226,12 @@ func (c *Config) validate() error {
 		return fmt.Errorf("invalid log format (available: %s, %s)", JSONLogFormat, PrettyLogFormat)
 	}
 
+	if c.DockerImage.Auth.Identifier == "" {
+		return errors.New("docker_image.auth.identifier is required, see https://docs.docker.com/reference/api/hub/latest/#tag/authentication-api/operation/AuthCreateAccessToken")
+	}
+	if c.DockerImage.Auth.Secret == "" {
+		return errors.New("docker_image.auth.secret is required, see https://docs.docker.com/reference/api/hub/latest/#tag/authentication-api/operation/AuthCreateAccessToken")
+	}
 	if len(c.DockerImage.Repositories) == 0 {
 		return errors.New("docker_image.repositories must be non-empty")
 	}
