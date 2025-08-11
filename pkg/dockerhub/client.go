@@ -99,7 +99,7 @@ func (c *Client) GetTags(repository string) ([]ImageTag, error) {
 func (c *Client) getTags(url string, token string) (*GetImageTagsResponse, error) { // nolint
 	c.rl.Take()
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http request: %w", err)
 	}
