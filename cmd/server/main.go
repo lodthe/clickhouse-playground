@@ -68,7 +68,7 @@ func main() {
 
 	// Initialize storages.
 	dynamodbClient := dynamodb.NewFromConfig(awsConfig)
-	dockerhubCli := dockerhub.NewClient(dockerhub.DockerHubURL, dockerhub.DefaultMaxRPS, dockerhub.Auth(config.DockerImage.Auth))
+	dockerhubCli := dockerhub.NewClient(logger, dockerhub.DockerHubURL, dockerhub.DefaultMaxRPS, dockerhub.Auth(config.DockerImage.Auth))
 	tagStorage := dockertag.NewCache(ctx, dockertag.Config{
 		Repositories:   config.DockerImage.Repositories,
 		OS:             config.DockerImage.OS,
