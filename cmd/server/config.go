@@ -79,6 +79,7 @@ type DockerImage struct {
 type API struct {
 	ListeningAddress string        `mapstructure:"address"`
 	ServerTimeout    time.Duration `mapstructure:"server_timeout"`
+	CacheDisabled    bool          `mapstructure:"cache_disabled"`
 }
 
 type AWS struct {

@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
-	zlog "github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"go.uber.org/ratelimit"
 )
 
-const DockerHubURL = "https://hub.docker.com/v2"
-const DefaultMaxRPS = 5
+const (
+	DockerHubURL    = "https://hub.docker.com/v2"
+	DefaultMaxRPS   = 5
+	DefaultPageSize = 100
+)
 
 // Auth holds information required to obtain an access token:
 // https://docs.docker.com/reference/api/hub/latest/#tag/authentication-api/operation/AuthCreateAccessToken
@@ -25,16 +29,19 @@ type Auth struct {
 type Client struct {
 	apiURL string
 	auth   Auth
-	rl     ratelimit.Limiter
+
+	rl  ratelimit.Limiter
+	log zerolog.Logger
 
 	cli *http.Client
 }
 
-func NewClient(apiURL string, maxRPS int, auth Auth, httpCli ...*http.Client) *Client {
+func NewClient(log zerolog.Logger, apiURL string, maxRPS int, auth Auth, httpCli ...*http.Client) *Client {
 	c := &Client{
 		apiURL: apiURL,
 		auth:   auth,
 		rl:     ratelimit.New(maxRPS),
+		log:    log,
 		cli:    http.DefaultClient,
 	}
 	if len(httpCli) == 1 {
@@ -71,15 +78,19 @@ func (c *Client) getAccessToken() (string, error) {
 
 // GetTags fetches tags of the given image.
 func (c *Client) GetTags(repository string) ([]ImageTag, error) {
+	startedAt := time.Now()
+
 	token, err := c.getAccessToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire an access token: %w", err)
 	}
 
-	nextURL := fmt.Sprintf("%s/repositories/%s/tags?page_size=100", c.apiURL, repository)
+	nextURL := fmt.Sprintf("%s/repositories/%s/tags?page_size=%d", c.apiURL, repository, DefaultPageSize)
 
+	var iterations int
 	var tags []ImageTag
 	for {
+		iterations++
 		resp, err := c.getTags(nextURL, token)
 		if err != nil {
 			return nil, err
@@ -92,6 +103,13 @@ func (c *Client) GetTags(repository string) ([]ImageTag, error) {
 
 		nextURL = *resp.Next
 	}
+
+	c.log.Info().
+		Dur("time_elapsed_ms", time.Since(startedAt)).
+		Int("count_api_calls", iterations).
+		Str("repository", repository).
+		Int("count_image_tags", len(tags)).
+		Msg("successfully fetched docker hub tags")
 
 	return tags, nil
 }
@@ -121,9 +139,16 @@ func (c *Client) getTags(url string, token string) (*GetImageTagsResponse, error
 
 	err = json.Unmarshal(body, response)
 	if err != nil {
-		zlog.Error().Err(err).Str("url", url).Str("body", string(body)).Msg("failed to fetch image tags")
+		c.log.Error().Err(err).Str("url", url).Str("body", string(body)).Msg("failed to fetch image tags")
 
 		return nil, errors.Wrap(err, "unmarshal failed")
+	}
+
+	for _, tag := range response.Results {
+		if len(tag.Images) == 0 {
+			c.log.Warn().Str("api_url", url).Interface("image_tag", tag).
+				Msg("got image tag with empty list of images from Docker Hub API; probably there are problems with API calls")
+		}
 	}
 
 	return response, nil

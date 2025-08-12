@@ -31,6 +31,10 @@ api:
   # [OPTIONAL] Request processing timeout. Default: 60s.
   server_timeout: 60s
 
+  # [OPTIONAL] Whether to send HTTP headers preventing upstream proxies to cache responses.
+  # Default: false.
+  cache_disabled: false
+
 # You can set some limits to prevent budget waste on storage and etc.
 limits:
   # If the length of a user's query exceeds this limit, the request is aborted.
