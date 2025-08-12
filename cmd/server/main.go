@@ -102,6 +102,7 @@ func main() {
 		TagStorage:      tagStorage,
 		RunRepo:         runRepo,
 		Timeout:         config.API.ServerTimeout,
+		CacheDisabled:   config.API.CacheDisabled,
 		MaxQueryLength:  lim.MaxOutputLength,
 		MaxOutputLength: lim.MaxOutputLength,
 	})

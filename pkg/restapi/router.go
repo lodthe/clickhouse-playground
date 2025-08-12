@@ -21,7 +21,8 @@ type RouterOpts struct {
 	TagStorage TagStorage
 	RunRepo    queryrun.Repository
 
-	Timeout time.Duration
+	Timeout       time.Duration
+	CacheDisabled bool
 
 	MaxQueryLength  uint64
 	MaxOutputLength uint64
@@ -40,6 +41,9 @@ func NewRouter(opts RouterOpts) http.Handler {
 	r.Use(middleware.Recoverer)
 
 	r.Use(middleware.Timeout(opts.Timeout))
+	if opts.CacheDisabled {
+		r.Use(middleware.NoCache)
+	}
 
 	r.Use(cors.Handler(cors.Options{
 		// AllowedOrigins:   []string{"https://foo.com"}, // Use this to allow specific origin hosts
