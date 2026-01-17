@@ -29,7 +29,6 @@ func (cs *ClickHouseSettings) FormatArgs(version string, defaultOutputFormat str
 
 		result = append(result,
 			"--output_format_pretty_color", "0",
-			"--output_format_pretty_grid_charset", "ASCII",
 			"--format", outputFormat)
 	}
 
