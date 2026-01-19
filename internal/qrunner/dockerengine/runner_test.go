@@ -77,7 +77,7 @@ func TestCustomSettings(t *testing.T) {
 			database:       "clickhouse",
 			version:        "21",
 			query:          "SELECT 1",
-			expectedOutput: "+-1-+\n| 1 |\n+---+\n",
+			expectedOutput: "┌─1─┐\n│ 1 │\n└───┘\n",
 			runSettings:    &runsettings.ClickHouseSettings{OutputFormat: "PrettyCompactMonoBlock"},
 		},
 		{
